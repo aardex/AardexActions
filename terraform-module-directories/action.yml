@@ -21,4 +21,4 @@ runs:
           | xargs -n1 dirname \
           | sort -u | tr '\n' ' ')
         echo -e "Directories:\n${MODULE_DIRS}"
-        echo "directories=$DIRS" >> $GITHUB_OUTPUT
+        echo "directories=$MODULE_DIRS" >> $GITHUB_OUTPUT
