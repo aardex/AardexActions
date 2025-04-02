@@ -2,23 +2,23 @@ name: module-directories
 description: List all module directories in a project
 
 outputs:
-	directories:
-		description: Array of module directories
-		value: ${{ steps.module-directories.outputs.directories }}
+  directories:
+    description: Array of module directories
+    value: ${{ steps.module-directories.outputs.directories }}
 
 runs:
-	using: composite
-	steps:
-		- name: Get Terraform module directories
-		  id: module-directories
-		  shell: bash
-		  run: | 
-			MODULE_DIRS=$(find . -type f -name "*.tf" \
+  using: composite
+  steps:
+    - name: Get Terraform module directories
+      id: module-directories
+      shell: bash
+      run: | 
+      MODULE_DIRS=$(find . -type f -name "*.tf" \
           -not -path "*/.terraform/*" \
-			    -not -path "*/.git/*" \
-		      -not -path "*/vendor/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
           -exec grep -l "required_version" {} \; \
         | xargs -n1 dirname \
-		    | sort -u | tr '\n' ' ')
-			echo -e "Directories:\n${MODULE_DIRS}"
-			echo "directories=$DIRS" >> $GITHUB_OUTPUT
+        | sort -u | tr '\n' ' ')
+      echo -e "Directories:\n${MODULE_DIRS}"
+      echo "directories=$DIRS" >> $GITHUB_OUTPUT
