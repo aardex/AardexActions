@@ -19,6 +19,6 @@ runs:
             -not -path "*/vendor/*" \
             -exec grep -l "required_version" {} \; \
           | xargs -n1 dirname \
-          | sort -u | tr '\n' ' ')
+          | sort -u | jq -R . | jq -s .)
         echo -e "Directories:\n${MODULE_DIRS}"
         echo "directories=$MODULE_DIRS" >> $GITHUB_OUTPUT
