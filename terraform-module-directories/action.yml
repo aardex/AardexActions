@@ -12,13 +12,13 @@ runs:
     - name: Get Terraform module directories
       id: module-directories
       shell: bash
-      run: | 
-      MODULE_DIRS=$(find . -type f -name "*.tf" \
-          -not -path "*/.terraform/*" \
-          -not -path "*/.git/*" \
-          -not -path "*/vendor/*" \
-          -exec grep -l "required_version" {} \; \
-        | xargs -n1 dirname \
-        | sort -u | tr '\n' ' ')
-      echo -e "Directories:\n${MODULE_DIRS}"
-      echo "directories=$DIRS" >> $GITHUB_OUTPUT
+      run: |
+        MODULE_DIRS=$(find . -type f -name "*.tf" \
+            -not -path "*/.terraform/*" \
+            -not -path "*/.git/*" \
+            -not -path "*/vendor/*" \
+            -exec grep -l "required_version" {} \; \
+          | xargs -n1 dirname \
+          | sort -u | tr '\n' ' ')
+        echo -e "Directories:\n${MODULE_DIRS}"
+        echo "directories=$DIRS" >> $GITHUB_OUTPUT
