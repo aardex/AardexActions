@@ -1,0 +1,23 @@
+name: terraform-docs
+description: Create documentation for the given Terraform module
+
+inputs:
+  directory:
+    description: Directory to format and validate
+    required: true
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Render terraform docs inside the README.md
+      uses: terraform-docs/gh-actions@v1.3.0
+      with:
+        working-dir: ${{ inputs.directory }}
+        output-file: README.md
+        output-method: inject
+        git-push: false
+        recursive: false
