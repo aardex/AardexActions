@@ -10,6 +10,9 @@ intputs:
 runs:
   using: composite
   steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
     - name: Format Terraform files
       id: format
       shell: bash
