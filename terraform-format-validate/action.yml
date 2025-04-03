@@ -16,8 +16,9 @@ runs:
     - name: Format Terraform files
       id: format
       shell: bash
+      working-directory: ${{ inputs.directory }}
       run: |
-        terraform fmt -check -recursive ${{ inputs.directory }}
+        terraform fmt -check -recursive
         if [ $? -ne 0 ]; then
           echo "Terraform files are not formatted correctly."
           exit 1
@@ -26,9 +27,10 @@ runs:
     - name: Validate Terraform files
       id: validate
       shell: bash
+      working-directory: ${{ inputs.directory }}
       run: |
-        terraform init ${{ inputs.directory }}
-        terraform validate ${{ inputs.directory }}
+        terraform init
+        terraform validate
         if [ $? -ne 0 ]; then
           echo "Terraform files are not valid."
           exit 1
