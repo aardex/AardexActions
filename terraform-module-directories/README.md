@@ -5,4 +5,20 @@ It's use full to apply Terraform validation or generating Terraform Docs.
 
 ## Usage
 
-> TODO
+```yaml
+jobs:
+  get-sources:
+    name: Get Workflow Sources
+    runs-on: ubuntu-latest
+    
+    outputs:
+      directories: ${{ steps.module-directories.outputs.directories }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get module directories
+        id: module-directories
+        uses: aardex/AardexActions/terraform-module-directories@main
+```

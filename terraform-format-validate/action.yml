@@ -1,0 +1,32 @@
+name: terraform-forat-validate
+description: Format and validate Terraform module for a given directory
+
+intputs:
+  directory:
+    description: Directory to format and validate
+    required: true
+    default: '.'
+
+runs:
+  using: composite
+  steps:
+    - name: Format Terraform files
+      id: format
+      shell: bash
+      run: |
+        terraform fmt -check -recursive ${{ inputs.directory }}
+        if [ $? -ne 0 ]; then
+          echo "Terraform files are not formatted correctly."
+          exit 1
+        fi
+
+    - name: Validate Terraform files
+      id: validate
+      shell: bash
+      run: |
+        terraform init ${{ inputs.directory }}
+        terraform validate ${{ inputs.directory }}
+        if [ $? -ne 0 ]; then
+          echo "Terraform files are not valid."
+          exit 1
+        fi
