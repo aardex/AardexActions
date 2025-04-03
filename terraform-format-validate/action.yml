@@ -1,7 +1,7 @@
 name: terraform-forat-validate
 description: Format and validate Terraform module for a given directory
 
-intputs:
+inputs:
   directory:
     description: Directory to format and validate
     required: true
