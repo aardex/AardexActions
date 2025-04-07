@@ -12,6 +12,5 @@ runs:
   steps:
     - name: Run script
       shell: bash
-      working-dir: ${{ inputs.directory }}
       run: |
-        bash ${{ github.action_path }}/action.sh
+        bash ${{ github.action_path }}/action.sh ${{ inputs.directory }}
