@@ -2,6 +2,8 @@
 
 Generate the documentation in `README.md` for the given module (directory).
 
+> **Warning** the documentation files are not push in the repository.
+
 ## Usage
 
 ```yaml

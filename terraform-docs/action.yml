@@ -21,3 +21,20 @@ runs:
         output-method: inject
         git-push: false
         recursive: false
+
+    - name: Prepare artifact content
+      id: prepare_artifact_content
+      run: |
+        mkdir -p tfdocs/${{ inputs.directory }}
+        cp "${{ inputs.directory }}/README.md" tfdocs/${{ inputs.directory }}/ || true
+
+        uuid=$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -d'-' -f1)
+        echo "artifact_name=tfdocs-${uuid}" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.prepare_artifact_content.outputs.artifact_name }}
+        path: tfdocs
+        if-no-files-found: ignore
+          
