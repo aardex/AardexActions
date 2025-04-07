@@ -5,10 +5,13 @@ inputs:
   directory:
     description: Directory to process
     required: true
+    default: '.'
 
 runs:
   using: "composite"
   steps:
     - name: Run script
       shell: bash
-      run: bash ${{ github.action_path }}/action.sh "${{ inputs.directory }}"
+      run: bash ${{ github.action_path }}/action.sh
+      with:
+        working-dir: ${{ inputs.directory }}
