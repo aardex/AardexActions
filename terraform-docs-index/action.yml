@@ -4,7 +4,6 @@ description: Create table of content for Terraform Documentation
 inputs:
   directory:
     description: Directory to process
-    required: true
     default: '.'
 
 runs:

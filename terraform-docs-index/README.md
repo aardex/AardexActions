@@ -1,5 +1,21 @@
 # Terraform Documentation Index
 
-For a given folder list, search for README file with TF Docs content and create a table of content in the project README.md
+Searches all README files recursively from the given directory and add a table of contents in the root README.
 
 ## Usage
+
+```yaml
+jobs:
+  documentation:
+    name: Module Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Terraform Format and Validate
+        uses: aardex/AardexActions/terraform-docs-index@main
+        with:
+          directory: '.'
+```
