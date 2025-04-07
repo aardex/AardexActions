@@ -1,0 +1,14 @@
+name: terraform-docs-index
+description: Create table of content for Terraform Documentation
+
+inputs:
+  directory:
+    description: Directory to process
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run script
+      shell: bash
+      run: bash ${{ github.action_path }}/action.sh "${{ inputs.directory }}"
