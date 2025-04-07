@@ -24,6 +24,7 @@ runs:
 
     - name: Prepare artifact content
       id: prepare_artifact_content
+      shell: bash
       run: |
         mkdir -p tfdocs/${{ inputs.directory }}
         cp "${{ inputs.directory }}/README.md" tfdocs/${{ inputs.directory }}/ || true
