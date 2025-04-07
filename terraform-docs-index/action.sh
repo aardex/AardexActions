@@ -35,6 +35,9 @@ done
   echo "$END_MARKER"
 } > "$TEMP_FILE"
 
+echo "Update: $README_PATH with content:"
+cat "$TEMP_FILE"
+
 # Create the README file with the generated content, if it does not exist
 if [[ ! -f "$README_PATH" ]]; then
   cat "$TEMP_FILE" > "$README_PATH"
