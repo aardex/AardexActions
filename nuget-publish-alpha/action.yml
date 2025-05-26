@@ -75,23 +75,22 @@ runs:
       shell: bash
       run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
 
-    - name: Build and package application
-#      TODO QTU : Replace by main
-      uses: aardex/AardexActions/dotnet-build@features/INFRA-128
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v4
       with:
-        build-target: 'Release'
-        working-directory: ${{ inputs.project }}
         dotnet-version: ${{ inputs.dotnet-version }}
-        output-path: 'app'
-        github-token: ${{ inputs.github-token }}
-        codecov-token: ${{ inputs.codecov-token }}
 
-    - name: Pack nuget
+    - name: Add GitHub source
+      shell: bash
+      run: |
+        dotnet nuget remove source github
+        dotnet nuget add source --username AardexAdmin --password ${{ secrets.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+
+    - name: Build & Pack nuget
       id: build_pack
       shell: bash
       run: |
-        ls -R  ${{ steps.project_vars.outputs.PROJECT_PATH }}
-        dotnet pack ${{ inputs.project }} --configuration Release -p:Version=${{ steps.determine_version.outputs.version }} --output ./output --no-restore
+        dotnet pack -c Release --no-restore --output ./output
         echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
 
