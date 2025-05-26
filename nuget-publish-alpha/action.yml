@@ -16,12 +16,13 @@ runs:
   using: composite
   steps:
     - name: Set environment variables
+      id: setup_vars
       shell: bash
       # TODO QTU : Replace by main
       run: |
-        echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_ENV
-        echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_ENV
-        echo "AARDEX_ACTIONS_BRANCH=features/INFRA-128" >> $GITHUB_ENV
+        echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_OUTPUT
+        echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_OUTPUT
+        echo "AARDEX_ACTIONS_BRANCH=features/INFRA-128" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -31,10 +32,10 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-        ref: ${{ env.AARDEX_ACTIONS_BRANCH }}
-        repository: ${{ env.AARDEX_ACTIONS_REPO }}
+        ref: ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_BRANCH }}
+        repository: ${{steps.setup_vars.outputs.AARDEX_ACTIONS_REPO }}
         token: ${{ inputs.github-token }}
-        path: ${{ env.AARDEX_ACTIONS_PATH }}
+        path: ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
 
     - name: Build Project Variables
       id: project_vars
@@ -53,7 +54,7 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        version=$(python3 ${{ env.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-alpha-version.py --branch "${{ github.ref }}")
+        version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-alpha-version.py --branch "${{ github.ref }}")
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Verify and Add RepositoryUrl in .csproj
@@ -99,7 +100,7 @@ runs:
 
     - name: Clean AardexActions
       shell: bash
-      run: rm -rf ${{ env.AARDEX_ACTIONS_PATH }}
+      run: rm -rf ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
 
     - name: Commit and Push Changes
       shell: bash
