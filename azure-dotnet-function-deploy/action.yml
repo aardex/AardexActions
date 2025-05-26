@@ -41,6 +41,18 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
+    - name: Debug - Show current location and files
+      shell: bash
+      run: |
+        echo "Current working directory:"
+        pwd
+        echo "\nContent of current directory:"
+        ls -la
+        echo "\nContent of parent directory:"
+        ls -la ..
+        echo "\nFull directory tree from current location:"
+        tree -L 3 || ls -R  # fallback to ls -R if tree is not available
+
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
       with:
