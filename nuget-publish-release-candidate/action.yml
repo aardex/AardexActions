@@ -1,5 +1,5 @@
-name: Create Alpha Version
-description: Increment and publish an alpha version of a nuget
+name: Create Release Candidate Version
+description: Increment and publish a release candidate version of a nuget
 
 inputs:
   project:
@@ -14,7 +14,7 @@ inputs:
 
 outputs:
   version:
-    description: "The generated alpha version"
+    description: "The generated release candidate version"
     value: ${{ steps.determine_version.outputs.version }}
 
 runs:
@@ -23,7 +23,6 @@ runs:
     - name: Set environment variables
       id: setup_vars
       shell: bash
-      # TODO QTU : Replace by main
       run: |
         echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_OUTPUT
         echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_OUTPUT
@@ -37,7 +36,7 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-      #      TODO QTU : Replace by main
+        # TODO QTU
         ref: features/INFRA-128
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
@@ -60,7 +59,7 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-alpha-version.py --branch "${{ github.ref }}")
+        version=$(python3 github-template/scripts/nuget/generate-release-candidate-version.py)
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
@@ -72,7 +71,7 @@ runs:
       run: |
         CSPROJ_PATH="${{ steps.project_vars.outputs.PROJECT_PATH }}/${{ steps.project_vars.outputs.PROJECT_NAME }}.csproj"
         REPO_URL="https://github.com/${{ github.repository }}"
-    
+        
         if grep -q "<RepositoryUrl>" "$CSPROJ_PATH"; then
           echo "RepositoryUrl already present in $CSPROJ_PATH"
         else
@@ -91,10 +90,12 @@ runs:
         dotnet nuget remove source github
         dotnet nuget add source --username AardexAdmin --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
 
-    - name: Build & Pack nuget
+    - name: Build & Pack & Pack nuget
       id: build_pack
       shell: bash
       run: |
+        dotnet build -c Release
+        dotnet test
         dotnet pack -c Release --output ./output
         echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
