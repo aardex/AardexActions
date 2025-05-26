@@ -94,7 +94,7 @@ runs:
 
     - name: Publish nuget
       shell: bash
-      run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{secrets.github-token}} --source "github"
+      run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{inputs.github-token}} --source "github"
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
 
     - name: Clean AardexActions
