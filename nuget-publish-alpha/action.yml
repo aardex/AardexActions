@@ -32,10 +32,11 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-        ref: ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_BRANCH }}
-        repository: ${{steps.setup_vars.outputs.AARDEX_ACTIONS_REPO }}
+      #      TODO QTU : Replace by main
+        ref: features/INFRA-128
+        repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
-        path: ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
+        path: AardexActions
 
     - name: Build Project Variables
       id: project_vars
