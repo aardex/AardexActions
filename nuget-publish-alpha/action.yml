@@ -1,0 +1,119 @@
+name: Create Alpha Version
+description: Increment and publish an alpha version of a nuget
+
+inputs:
+  project:
+    required: true
+    description: "Path to .csproj to publish"
+  environment:
+    required: true
+    description: ""
+  dotnet-version:
+    required: false
+    description: ".NET SDK version to use"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+
+runs:
+  using: composite
+  steps:
+    - name: Set environment variables
+      shell: bash
+      # TODO QTU : Replace by main
+      run: |
+        echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_ENV
+        echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_ENV
+        echo "AARDEX_ACTIONS_BRANCH=features/INFRA-128" >> $GITHUB_ENV
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ env.AARDEX_ACTIONS_BRANCH }}
+        repository: ${{ env.AARDEX_ACTIONS_REPO }}
+        token: ${{ inputs.github-token }}
+        path: ${{ env.AARDEX_ACTIONS_PATH }}
+
+    - name: Build Project Variables
+      id: project_vars
+      shell: bash
+      run: |
+        cd "${{ inputs.project }}"
+        echo "PROJECT_PATH=$(pwd)" >> "$GITHUB_OUTPUT"
+        echo "PROJECT_NAME=$(basename $(pwd))" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Determine version
+      id: determine_version
+      shell: bash
+      run: |
+        version=$(python3 ${{ env.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-alpha-version.py --branch "${{ github.ref }}")
+        echo "version=$version" >> $GITHUB_OUTPUT
+
+    - name: Verify and Add RepositoryUrl in .csproj
+      shell: bash
+      run: |
+        CSPROJ_PATH="${{ steps.project_vars.outputs.PROJECT_PATH }}/${{ steps.project_vars.outputs.PROJECT_NAME }}.csproj"
+        REPO_URL="https://github.com/${{ github.repository }}"
+    
+        if grep -q "<RepositoryUrl>" "$CSPROJ_PATH"; then
+          echo "RepositoryUrl already present in $CSPROJ_PATH"
+        else
+          echo "RepositoryUrl and RepositoryType added to $CSPROJ_PATH"
+          sed -i '/<\/PropertyGroup>/i \ \ \ \ <RepositoryUrl>'"$REPO_URL"'</RepositoryUrl>\n\ \ \ \ <RepositoryType>git</RepositoryType>' "$CSPROJ_PATH"
+        fi
+
+    - name: Update package version
+      shell: bash
+      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
+
+    - name: Build and package application
+#      TODO QTU : Replace by main
+      uses: aardex/AardexActions/dotnet-build@features/INFRA-128
+      with:
+        build-target: 'Release'
+        working-directory: ${{ inputs.project }}
+        dotnet-version: ${{ inputs.dotnet-version }}
+        output-path: 'app'
+        github-token: ${{ inputs.github-token }}
+        codecov-token: ${{ inputs.codecov-token }}
+
+    - name: Pack nuget
+      id: build_pack
+      shell: bash
+      run: |
+        dotnet pack -c Release --no-restore --output ./output
+        echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
+      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
+
+    - name: Publish nuget
+      shell: bash
+      run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{secrets.github-token}} --source "github"
+      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
+
+    - name: Clean AardexActions
+      shell: bash
+      run: rm -rf ${{ env.AARDEX_ACTIONS_PATH }}
+
+    - name: Commit and Push Changes
+      shell: bash
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        
+        if [[ -n "$(git status --porcelain)" ]]; then
+          git add .
+          git commit -m "Version ${{ steps.determine_version.outputs.version }}"
+          git push
+        else
+          echo "No changes to commit"
+        fi
