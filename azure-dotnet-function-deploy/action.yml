@@ -29,7 +29,7 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-  azure-profile-base:
+  azure-profile:
     required: true
     description: "Azure publish profile"
 
