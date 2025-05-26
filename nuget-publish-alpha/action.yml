@@ -92,6 +92,7 @@ runs:
       run: |
         dotnet pack ${{ inputs.project }} --configuration Release -p:Version=${{ steps.determine_version.outputs.version }} --output ./output --no-restore
         echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
+        ls -R  ${{ steps.project_vars.outputs.PROJECT_PATH }}
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
 
     - name: Publish nuget
