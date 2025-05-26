@@ -84,7 +84,7 @@ runs:
       shell: bash
       run: |
         dotnet nuget remove source github
-        dotnet nuget add source --username AardexAdmin --password ${{ secrets.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+        dotnet nuget add source --username AardexAdmin --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
 
     - name: Build & Pack nuget
       id: build_pack
