@@ -18,6 +18,19 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+      #      TODO QTU : Replace by main
+        ref: features/INFRA-128
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Update package version
+      shell: bash
+      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ inputs.version }}
+
     - name: Configure Git
       shell: bash
       run: |
