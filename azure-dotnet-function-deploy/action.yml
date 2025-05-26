@@ -49,13 +49,13 @@ runs:
     - name: Install python dependencies
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
-      run: pip install -r github-templates/scripts/requirements.txt
+      run: pip install -r ../scripts/requirements.txt
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: |
-        python3 ../scripts/app/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+        python3 ../scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and package function
 #      TODO QTU
