@@ -1,5 +1,5 @@
-name: Deploy Dotnet Function
-description: Deploy a .NET function to Azure
+name: Deploy Dotnet App Service
+description: Deploy a .NET application to Azure App Service
 
 inputs:
   environment:
@@ -11,17 +11,13 @@ inputs:
   project:
     required: true
     description: "Project path to deploy"
-  func-name:
+  app-name:
     required: true
-    description: "Name of the Azure Function"
+    description: "Name of the Azure Web App"
   config-file-path:
     required: false
     default: ''
     description: "Path to configuration file"
-  flex-consumption:
-    required: false
-    default: "false"
-    description: "Whether to deploy as flex consumption plan"
   dotnet-version:
     required: false
     default: '8.0.x'
@@ -47,7 +43,7 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-#      TODO QTU : Replace by main
+      #      TODO QTU : Replace by main
         ref: features/INFRA-128
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
@@ -69,7 +65,7 @@ runs:
       run: |
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
-    - name: Build and package function
+    - name: Build and package application
 #      TODO QTU : Replace by main
       uses: aardex/AardexActions/dotnet-build@features/INFRA-128
       with:
@@ -80,19 +76,9 @@ runs:
         github-token: ${{ inputs.github-token }}
         codecov-token: ${{ inputs.codecov-token }}
 
-    - name: Deploy standard consumption function
-      if: ${{ inputs.flex-consumption == 'false' }}
-      uses: azure/functions-action@v1.5.3
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
       with:
-        app-name: 'func-${{ inputs.func-name }}-${{ inputs.azure-environment }}'
+        app-name: 'app-${{ inputs.app-name }}-${{ inputs.azure-environment }}'
         publish-profile: ${{ inputs.azure-profile }}
         package: '${{ inputs.project }}/app'
-
-    - name: Deploy flex consumption function
-      if: ${{ inputs.flex-consumption == 'true' }}
-      uses: azure/functions-action@v1.5.3
-      with:
-        app-name: 'func-${{ inputs.func-name }}-${{ inputs.azure-environment }}'
-        publish-profile: ${{ inputs.azure-profile }}
-        package: '${{ inputs.project }}/app'
-        sku: "flexconsumption"
