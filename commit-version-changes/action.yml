@@ -9,9 +9,6 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-  ref-name:
-    required: true
-    description: "Branch name to pull from/push to"
 
 runs:
   using: composite
@@ -27,7 +24,7 @@ runs:
       run: |
         # Fetch and incorporate remote changes
         git fetch origin
-        git pull --rebase origin ${{ inputs.ref-name }}
+        git pull --rebase origin ${{ github.ref }}
         
         # Check and commit changes if any
         if [[ -n "$(git status --porcelain)" ]]; then

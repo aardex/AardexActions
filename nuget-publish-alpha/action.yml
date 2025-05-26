@@ -12,6 +12,11 @@ inputs:
     required: true
     description: "GitHub token for authentication"
 
+outputs:
+  version:
+    description: "The generated alpha version"
+    value: ${{ steps.determine_version.outputs.version }}
+
 runs:
   using: composite
   steps:
