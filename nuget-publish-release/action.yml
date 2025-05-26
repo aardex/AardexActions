@@ -58,7 +58,7 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        version=$(python3 AardexActions/scripts/nuget/generate-release-version.py)
+        version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-release-version.py)
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
