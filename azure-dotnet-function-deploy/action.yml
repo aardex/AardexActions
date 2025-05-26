@@ -41,17 +41,12 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
-    - name: Debug - Show current location and files
-      shell: bash
-      run: |
-        echo "Current working directory:"
-        pwd
-        echo "\nContent of current directory:"
-        ls -la
-        echo "\nContent of parent directory:"
-        ls -la ..
-        echo "\nFull directory tree from current location:"
-        tree -L 3 || ls -R  # fallback to ls -R if tree is not available
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        repository: aardex/AardexActions
+        token: ${{ secrets.github-token }}
+        path: AardexActions
 
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
@@ -61,13 +56,13 @@ runs:
     - name: Install python dependencies
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
-      run: pip install -r scripts/requirements.txt
+      run: pip install -r AardexActions/scripts/requirements.txt
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: |
-        python3 scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and package function
 #      TODO QTU
