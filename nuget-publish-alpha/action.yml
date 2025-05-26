@@ -90,7 +90,7 @@ runs:
       id: build_pack
       shell: bash
       run: |
-        dotnet pack -c Release --no-restore --output ./output
+        dotnet pack -c Release --output ./output
         echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
 
