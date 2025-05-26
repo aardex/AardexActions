@@ -109,6 +109,11 @@ runs:
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
         
+        # Fetch and incorporate remote changes
+        git fetch origin
+        git pull --rebase origin ${{ github.ref_name }}
+        
+        # Check and commit changes if any
         if [[ -n "$(git status --porcelain)" ]]; then
           git add .
           git commit -m "Version ${{ steps.determine_version.outputs.version }}"
