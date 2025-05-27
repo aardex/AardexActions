@@ -1,0 +1,96 @@
+name: Deploy Dotnet Function
+description: Deploy a .NET function to Azure
+
+inputs:
+  environment:
+    required: true
+    description: "Target environment for deployment"
+  azure-environment:
+    required: true
+    description: "Azure environment to use"
+  project:
+    required: true
+    description: "Project path to deploy"
+  func-name:
+    required: true
+    description: "Name of the Azure Function"
+  config-file-path:
+    required: false
+    default: ''
+    description: "Path to configuration file"
+  flex-consumption:
+    required: false
+    default: "false"
+    description: "Whether to deploy as flex consumption plan"
+  dotnet-version:
+    required: false
+    default: '8.0.x'
+    description: ".NET SDK version to use"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+  azure-profile:
+    required: true
+    description: "Azure publish profile"
+  codecov-token:
+    required: false
+    description: "Codecov token"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install python dependencies
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: pip install -r AardexActions/scripts/requirements.txt
+
+    - name: Setup config
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: |
+        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+
+    - name: Build and package function
+      uses: aardex/AardexActions/dotnet-build@main
+      with:
+        build-target: 'Release'
+        working-directory: ${{ inputs.project }}
+        dotnet-version: ${{ inputs.dotnet-version }}
+        output-path: 'app'
+        github-token: ${{ inputs.github-token }}
+        codecov-token: ${{ inputs.codecov-token }}
+
+    - name: Deploy standard consumption function
+      if: ${{ inputs.flex-consumption == 'false' }}
+      uses: azure/functions-action@v1.5.3
+      with:
+        app-name: 'func-${{ inputs.func-name }}-${{ inputs.azure-environment }}'
+        publish-profile: ${{ inputs.azure-profile }}
+        package: '${{ inputs.project }}/app'
+
+    - name: Deploy flex consumption function
+      if: ${{ inputs.flex-consumption == 'true' }}
+      uses: azure/functions-action@v1.5.3
+      with:
+        app-name: 'func-${{ inputs.func-name }}-${{ inputs.azure-environment }}'
+        publish-profile: ${{ inputs.azure-profile }}
+        package: '${{ inputs.project }}/app'
+        sku: "flexconsumption"
