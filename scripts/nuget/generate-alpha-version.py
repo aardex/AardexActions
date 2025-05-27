@@ -44,4 +44,5 @@ def main():
         print("Invalid format")
 
 
-main()
+if __name__ == '__main__':
+    main()

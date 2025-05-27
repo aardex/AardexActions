@@ -47,8 +47,7 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-#      TODO QTU : Replace by main
-        ref: features/INFRA-128
+        ref: main
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
         path: AardexActions
@@ -70,8 +69,7 @@ runs:
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and package function
-#      TODO QTU : Replace by main
-      uses: aardex/AardexActions/dotnet-build@features/INFRA-128
+      uses: aardex/AardexActions/dotnet-build@main
       with:
         build-target: 'Release'
         working-directory: ${{ inputs.project }}

@@ -28,4 +28,5 @@ def main():
     write_version_to_csproj(new_version)
 
 
-main()
+if __name__ == '__main__':
+    main()

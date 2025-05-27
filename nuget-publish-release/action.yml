@@ -26,7 +26,7 @@ runs:
       run: |
         echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_OUTPUT
         echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_OUTPUT
-        echo "AARDEX_ACTIONS_BRANCH=features/INFRA-128" >> $GITHUB_OUTPUT
+        echo "AARDEX_ACTIONS_BRANCH=main" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -36,7 +36,7 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-        ref: features/INFRA-128
+        ref: main
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
         path: AardexActions
