@@ -16,6 +16,16 @@ This project includes github actions that can be used through our CI/CD chains, 
 - Deploy [Azure Dotnet App Service](./azure-dotnet-app-service-deploy/README.md): Deploy a .NET application to Azure App Service
 
 ### Dotnet Nuget
+> ⚠️ **Important Note**  
+> If you want to use the Nuget workflows, in the project root you must have a **`Directory.Build.props`** file with the following content:
+> ```xml
+> <Project>
+>     <PropertyGroup>
+>         <Version>0.6.17-alpha.8.0</Version>
+>     </PropertyGroup>
+> </Project>
+> ```
+> **And EVERY .csproj doesn't have a version tag**
 - Create [Alpha Version](./nuget-publish-alpha/README.md): Automatically generate and publish an alpha NuGet package version for early testing
 - Create [Release Candidate Version](./nuget-publish-release-candidate/README.md): Increment and publish a release candidate NuGet version for pre-release validation
 - Create [Release Version](./nuget-publish-release/README.md): Increment and publish a stable NuGet package version for production use
