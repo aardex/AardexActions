@@ -82,11 +82,12 @@ runs:
     - name: Build
       shell: bash
       run: |
-        if [ -n "${{ inputs.output-path }}" ]; then
-          dotnet build --configuration ${{ inputs.build-target }} --no-restore -o ${{ inputs.output-path }}
+        if [ -n "app" ]; then
+          dotnet build --configuration ${{ inputs.build-target }} --no-restore -o app
         else
           dotnet build --configuration ${{ inputs.build-target }} --no-restore
         fi
+      working-directory: ${{ inputs.project }}
 
     - name: Test
       shell: bash
@@ -98,6 +99,7 @@ runs:
           /p:CoverletOutput="$(pwd)/.coverage/" \
           /p:MergeWith="$(pwd)/.coverage/coverage.json" \
           /p:CoverletOutputFormat="cobertura%2cjson"
+      working-directory: ${{ inputs.project }}
 
     - name: Codecov
       uses: codecov/codecov-action@v4
