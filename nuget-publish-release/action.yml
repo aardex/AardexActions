@@ -8,6 +8,7 @@ inputs:
   dotnet-version:
     required: false
     description: ".NET SDK version to use"
+    default: "8.x"
   github-token:
     required: true
     description: "GitHub token for authentication"
