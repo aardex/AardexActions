@@ -64,15 +64,46 @@ runs:
       run: |
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
-    - name: Build and package application
-      uses: aardex/AardexActions/dotnet-build@main
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v4
       with:
-        build-target: 'Release'
-        working-directory: ${{ inputs.project }}
         dotnet-version: ${{ inputs.dotnet-version }}
-        output-path: 'app'
-        github-token: ${{ inputs.github-token }}
-        codecov-token: ${{ inputs.codecov-token }}
+
+    - name: Add GitHub nuget source
+      shell: bash
+      run: |
+        dotnet nuget remove source github
+        dotnet nuget add source --username github --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+
+    - name: Restore
+      shell: bash
+      run: dotnet restore
+
+    - name: Build
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.output-path }}" ]; then
+          dotnet build --configuration ${{ inputs.build-target }} --no-restore -o ${{ inputs.output-path }}
+        else
+          dotnet build --configuration ${{ inputs.build-target }} --no-restore
+        fi
+
+    - name: Test
+      shell: bash
+      run: |
+        dotnet test \
+          -e "ASPNETCORE_ENVIRONMENT=Development" \
+          --no-restore \
+          /p:CollectCoverage=true \
+          /p:CoverletOutput="$(pwd)/.coverage/" \
+          /p:MergeWith="$(pwd)/.coverage/coverage.json" \
+          /p:CoverletOutputFormat="cobertura%2cjson"
+
+    - name: Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ inputs.codecov-token }}
+        file: .coverage/coverage.cobertura.xml
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
