@@ -30,6 +30,10 @@ runs:
       shell: bash
       run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ inputs.version }}
 
+    - name: Clean AardexActions
+      shell: bash
+      run: rm -rf AardexActions
+
     - name: Commit and Push Changes
       shell: bash
       run: |
