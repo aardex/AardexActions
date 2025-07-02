@@ -1,6 +1,13 @@
 name: module-directories
 description: List all module directories in a project
 
+inputs:
+  exclude:
+    description: |
+      List of additional directory patterns to exclude from the search (separated by newlines or commas)
+    required: false
+    default: ""
+
 outputs:
   directories:
     description: Array of module directories
@@ -13,7 +20,13 @@ runs:
       id: module-directories
       shell: bash
       run: |
+        EXCLUDE_PATTERNS=''
+        for pattern in $(echo "${{ inputs.exclude }}" | tr ',' '\n'); do
+          EXCLUDE_PATTERNS="$EXCLUDE_PATTERNS -not -path \"$pattern\""
+        done
+
         MODULE_DIRS=$(find . -type f -name "*.tf" \
+            ${EXCLUDE_PATTERNS} \
             -not -path "*/.terraform/*" \
             -not -path "*/.git/*" \
             -not -path "*/vendor/*" \
