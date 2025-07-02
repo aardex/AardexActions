@@ -6,9 +6,10 @@
 
 # Variables and Context
 START_PATH="${1:-$(pwd)}"
+OUTPUT_PATH="${2:-$(pwd)}"
 
 TFDOC_PARAM="markdown document --hide-empty"
-README_PATH="${START_PATH}/README.md"
+README_PATH="${OUTPUT_PATH}/README.md"
 
 TEMP_FILE=$(mktemp)
 TEMP_CONTENT=$(mktemp)
@@ -21,6 +22,11 @@ END_MARKER="<!-- END_TF_DOCS -->"
 find "$START_PATH" -type f -name "[README|SUMMARY]*" -not -path "**/.terraform/**" -not -path "**/terraform-modules/**" | while read -r README_PATH; do
     DIR_PATH=$(dirname "$README_PATH")
     TF_FILES=$(find "$DIR_PATH/" -maxdepth 1 -type f -name "*.tf")
+
+    TF_MODULE=$(grep '^# ' "${README_PATH}" | head -n 1 | sed 's/^# //')
+    if [[ -z "$TF_MODULE" ]]; then
+      TF_MODULE=$(basename "$DIR_PATH")
+    fi
 
     if [[ ! -z "$TF_FILES" ]]; then
         REL_PATH=".${DIR_PATH#"$START_PATH"}"
