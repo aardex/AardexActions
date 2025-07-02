@@ -23,12 +23,12 @@ find "$START_PATH" -type f -name "[README|SUMMARY]*" -not -path "**/.terraform/*
     DIR_PATH=$(dirname "$README_PATH")
     TF_FILES=$(find "$DIR_PATH/" -maxdepth 1 -type f -name "*.tf")
 
-    TF_MODULE=$(grep '^# ' "${README_PATH}" | head -n 1 | sed 's/^# //')
-    if [[ -z "$TF_MODULE" ]]; then
-      TF_MODULE=$(basename "$DIR_PATH")
-    fi
-
     if [[ ! -z "$TF_FILES" ]]; then
+        TF_MODULE=$(grep '^# ' "${README_PATH}" | head -n 1 | sed 's/^# //')
+        if [[ -z "$TF_MODULE" ]]; then
+          TF_MODULE=$(basename "$DIR_PATH")
+        fi
+
         REL_PATH=".${DIR_PATH#"$START_PATH"}"
         echo "- [$TF_MODULE]($REL_PATH)" >> "$TEMP_CONTENT"
     fi
@@ -41,7 +41,7 @@ done
   echo "$END_MARKER"
 } > "$TEMP_FILE"
 
-echo "Update: $README_PATH with content:"
+echo -e "\nUpdate: $README_PATH with content:"
 cat "$TEMP_FILE"
 
 # Create the README file with the generated content, if it does not exist
