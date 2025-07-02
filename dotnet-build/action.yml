@@ -1,0 +1,75 @@
+name: Dotnet Build
+description: Build and test .NET project
+
+inputs:
+  build-target:
+    default: 'Debug'
+    description: ""
+  working-directory:
+    default: '.'
+    description: ""
+  dotnet-version:
+    required: false
+    default: "8.0.x"
+    description: ""
+  output-path:
+    required: false
+    description: ""
+  github-token:
+    required: true
+    description: ""
+  codecov-token:
+    required: true
+    description: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Add GitHub nuget source
+      shell: bash
+      run: |
+        dotnet nuget remove source github
+        dotnet nuget add source --username github --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+
+    - name: Restore
+      shell: bash
+      run: dotnet restore
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Build
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.output-path }}" ]; then
+          dotnet build --configuration ${{ inputs.build-target }} --no-restore -o ${{ inputs.output-path }}
+        else
+          dotnet build --configuration ${{ inputs.build-target }} --no-restore
+        fi
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Test
+      shell: bash
+      run: |
+        dotnet test \
+          -e "ASPNETCORE_ENVIRONMENT=Development" \
+          --no-restore \
+          /p:CollectCoverage=true \
+          /p:CoverletOutput="$(pwd)/.coverage/" \
+          /p:MergeWith="$(pwd)/.coverage/coverage.json" \
+          /p:CoverletOutputFormat="cobertura%2cjson"
+      working-directory: ${{ inputs.working-directory }}
+
+    - name: Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ inputs.codecov-token }}
+        file: .coverage/coverage.cobertura.xml

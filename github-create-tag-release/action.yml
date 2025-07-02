@@ -1,0 +1,44 @@
+name: Create Tag and Release
+description: Creates a new tag and GitHub release
+
+inputs:
+  version:
+    required: true
+    description: "Version number to use for tag and release"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+  prerelease:
+    required: false
+    description: "Whether this is a prerelease"
+    default: 'false'
+  draft:
+    required: false
+    description: "Whether this is a draft release"
+    default: 'false'
+  files:
+    required: false
+    description: "Files to include in the release"
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Create tag and release
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ inputs.version }}
+        name: Release ${{ inputs.version }}
+        body: |
+          Release ${{ inputs.version }}
+        draft: ${{ inputs.draft }}
+        prerelease: ${{ inputs.prerelease }}
+        files: ${{ inputs.files }}

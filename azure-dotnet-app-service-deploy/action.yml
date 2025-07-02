@@ -1,0 +1,111 @@
+name: Deploy Dotnet App Service
+description: Deploy a .NET application to Azure App Service
+
+inputs:
+  environment:
+    required: true
+    description: "Target environment for deployment"
+  azure-environment:
+    required: true
+    description: "Azure environment to use"
+  project:
+    required: true
+    description: "Project path to deploy"
+  app-name:
+    required: true
+    description: "Name of the Azure Web App"
+  config-file-path:
+    required: false
+    default: ''
+    description: "Path to configuration file"
+  dotnet-version:
+    required: false
+    default: '8.0.x'
+    description: ".NET SDK version to use"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+  azure-profile:
+    required: true
+    description: "Azure publish profile"
+  codecov-token:
+    required: false
+    description: "Codecov token"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install python dependencies
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: pip install -r AardexActions/scripts/requirements.txt
+
+    - name: Setup config
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: |
+        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Add GitHub nuget source
+      shell: bash
+      run: |
+        dotnet nuget remove source github
+        dotnet nuget add source --username github --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+
+    - name: Restore
+      shell: bash
+      run: dotnet restore
+
+    - name: Build
+      shell: bash
+      run: |
+        dotnet build --configuration ${{ inputs.build-target }} --no-restore -o app
+      working-directory: ${{ inputs.project }}
+
+    - name: Test
+      shell: bash
+      run: |
+        dotnet test \
+          -e "ASPNETCORE_ENVIRONMENT=Development" \
+          --no-restore \
+          /p:CollectCoverage=true \
+          /p:CoverletOutput="$(pwd)/.coverage/" \
+          /p:MergeWith="$(pwd)/.coverage/coverage.json" \
+          /p:CoverletOutputFormat="cobertura%2cjson"
+      working-directory: ${{ inputs.project }}
+
+    - name: Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ inputs.codecov-token }}
+        file: .coverage/coverage.cobertura.xml
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'app-${{ inputs.app-name }}-${{ inputs.azure-environment }}'
+        publish-profile: ${{ inputs.azure-profile }}
+        package: '${{ inputs.project }}/app'

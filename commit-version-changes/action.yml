@@ -1,0 +1,44 @@
+
+name: Commit Version Changes
+description: Commits and pushes version changes to the repository
+
+inputs:
+  version:
+    required: true
+    description: "Version number to use in commit message"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Update package version
+      shell: bash
+      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ inputs.version }}
+
+    - name: Clean AardexActions
+      shell: bash
+      run: rm -rf AardexActions
+
+    - name: Commit and Push Changes
+      shell: bash
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git add .
+        git commit -m "${{ inputs.version }}"
+        git push
