@@ -21,4 +21,6 @@ jobs:
       - name: Get module directories
         id: module-directories
         uses: aardex/AardexActions/terraform-module-directories@main
+        with:
+          exclude_directories: 'sample'
 ```
