@@ -2,7 +2,7 @@ name: module-directories
 description: List all module directories in a project
 
 inputs:
-  exclude:
+  exclude_directories:
     description: |
       List of additional directory patterns to exclude from the search (separated by newlines or commas)
     required: false
@@ -21,7 +21,7 @@ runs:
       shell: bash
       run: |
         EXCLUDE_PATTERNS=''
-        for pattern in $(echo "${{ inputs.exclude }}" | tr ',' '\n'); do
+        for pattern in $(echo "${{ inputs.exclude_directories }}" | tr ',' '\n'); do
           EXCLUDE_PATTERNS="$EXCLUDE_PATTERNS -not -path \"$pattern\""
         done
 
