@@ -2,7 +2,7 @@ name: module-directories
 description: List all module directories in a project
 
 inputs:
-  exclude_directories:
+  exclude_patterns:
     description: |
       List of additional directory patterns to exclude from the search (separated by newlines or commas)
     required: false
@@ -20,18 +20,15 @@ runs:
       id: module-directories
       shell: bash
       run: |
-        EXCLUDE_PATTERNS=''
-        for pattern in $(echo "${{ inputs.exclude_directories }}" | tr ',' '\n'); do
-          EXCLUDE_PATTERNS="$EXCLUDE_PATTERNS -not -path \"$pattern\""
-        done
+        EXCLUDE_FILTER=$(echo "{{ inputs.exclude_patterns }}" | tr ',' '\n' | sed 's/.*/-not -path &/' | tr '\n' ' ')
+        echo "Excluding: ${EXCLUDE_FILTER}\n"
 
         MODULE_DIRS=$(find . -type f -name "*.tf" \
-            ${EXCLUDE_PATTERNS} \
-            -not -path "*/.terraform/*" \
-            -not -path "*/.git/*" \
-            -not -path "*/vendor/*" \
-            -exec grep -l "required_version" {} \; \
-          | xargs -n1 dirname \
-          | sort -u | jq -R . | jq -sc .)
+          -not -path "*/.terraform/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/vendor/*" \
+          ${EXCLUDE_FILTER} \
+          -exec grep -l "required_version" {} \; | xargs -n1 dirname | sort -u | jq -R . | jq -sc .)
+        
         echo -e "Directories:\n${MODULE_DIRS}"
         echo "directories=$MODULE_DIRS" >> $GITHUB_OUTPUT
