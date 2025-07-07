@@ -20,7 +20,7 @@ runs:
       id: module-directories
       shell: bash
       run: |
-        EXCLUDE_FILTER=$(echo "{{ inputs.exclude_patterns }}" | tr ',' '\n' | sed 's/.*/-not -path &/' | tr '\n' ' ')
+        EXCLUDE_FILTER=$(echo "${{ inputs.exclude_patterns }}" | tr ',' '\n' | sed 's/.*/-not -path &/' | tr '\n' ' ')
         echo "Excluding: ${EXCLUDE_FILTER}\n"
 
         MODULE_DIRS=$(find . -type f -name "*.tf" \
