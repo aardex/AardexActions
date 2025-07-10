@@ -34,9 +34,6 @@ inputs:
   resource-group:
     required: true
     description: "Azure Resource Group name"
-  location:
-    required: true
-    description: "Azure region"
 
 runs:
   using: composite
