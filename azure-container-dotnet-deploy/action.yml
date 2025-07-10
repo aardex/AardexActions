@@ -8,9 +8,6 @@ inputs:
   azure-environment:
     required: true
     description: "Azure environment to use"
-  project:
-    required: true
-    description: "Project path to deploy"
   app-name:
     required: true
     description: "Name of the Azure Container App"
@@ -28,9 +25,15 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
-  acr-name:
+  acr-registry:
     required: true
     description: "Azure Container Registry name"
+  acr-username:
+    required: true
+    description: "Azure Container Registry Username"
+  acr-password:
+    required: true
+    description: "Azure Container Registry Password"
   resource-group:
     required: true
     description: "Azure Resource Group name"
@@ -67,17 +70,12 @@ runs:
       run: |
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ inputs.azure-credentials }}
-
     - name: Login to Azure Container Registry
       uses: azure/docker-login@v1
       with:
-        login-server: ${{ inputs.acr-name }}.azurecr.io
-        username: ${{ inputs.acr-name }}
-        password: ${{ inputs.azure-credentials }}
+        login-server: ${{ inputs.acr-registry }}
+        username: ${{ inputs.acr-username }}
+        password: ${{ inputs.acr-password }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -88,19 +86,24 @@ runs:
         context: .
         push: true
         tags: |
-          ${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:${{ inputs.version }}
-          ${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:latest
-        cache-from: type=registry,ref=${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:buildcache
-        cache-to: type=registry,ref=${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:buildcache,mode=max
+          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
+          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:latest
+        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache,mode=max
         
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:${{ inputs.version }}
+        image-ref: ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
         severity: 'CRITICAL,HIGH'
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ inputs.azure-credentials }}
 
     - name: Deploy to Azure Container Apps
       shell: bash
@@ -109,5 +112,5 @@ runs:
         az containerapp update \
           --name ${{ inputs.app-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.resource-group }} \
-          --image ${{ inputs.acr-name }}.azurecr.io/${{ inputs.app-name }}:${{ inputs.version }} \
-          --registry-server ${{ inputs.acr-name }}.azurecr.io
+          --image ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }} \
+          --registry-server ${{ inputs.acr-registry }}
