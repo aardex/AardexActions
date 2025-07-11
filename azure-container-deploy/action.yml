@@ -1,5 +1,5 @@
-name: Deploy .Net Docker to Container App
-description: Deploy a Docker .NET application to Azure Container Apps
+name: Deploy Docker to Container App
+description: Build & Deploy a Docker application to Azure Container Apps
 
 inputs:
   environment:
@@ -18,7 +18,7 @@ inputs:
   config-file-path:
     required: false
     default: ''
-    description: "Path to configuration file"
+    description: "Path to configuration file. Only required for .Net projects."
   github-token:
     required: true
     description: "GitHub token for authentication"
