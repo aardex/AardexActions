@@ -50,7 +50,9 @@ runs:
     - name: Update version file
       shell: bash
       run: |
-        echo "${{ steps.version_compute.outputs.version }}" > ${{ env.VERSION_FILE }}
+        VERSION_FILE="${{ inputs.version_file }}"
+        VERSION_FILE="${VERSION_FILE:-${{ env.VERSION_FILE }}}"
+        echo "${{ steps.version_compute.outputs.version }}" > "$VERSION_FILE"
 
     - name: Commit Version Changes
       shell: bash
