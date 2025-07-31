@@ -1,0 +1,60 @@
+name: terraform-version-update
+description: Increment, upcate and return a Terraform module version
+
+env:
+  VERSION_FILE: "version.txt"
+
+inputs:
+  type:
+    description: The type of version increment (major, minor, patch, release-candidate, alpha)
+    required: true
+    type: choice
+    options:
+      - major
+      - minor
+      - patch
+      - release-candidate
+      - alpha
+      
+  version:
+    description: The current version of the Terraform module (optional if version file exists)
+    type: string
+    default: ''
+
+  version_file:
+    description: The file containing the current version (default: version.txt)
+    type: string
+    default: ''
+
+outputs:
+  version:
+    description: The new version number
+    value: ${{ steps.version_compute.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute new version  
+      id: version_compute
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file || env.VERSION_FILE }}"
+
+    - name: Show new version
+      shell: bash
+      run: |
+        echo "Updated version: ${{ inputs.version }} -> ${{ steps.version_compute.outputs.version }}"
+
+    - name: Update version file
+      shell: bash
+      run: |
+        echo "${{ steps.version_compute.outputs.version }}" > ${{ env.VERSION_FILE }}
+
+    - name: Commit Version Changes
+      shell: bash
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git add ${{ env.VERSION_FILE }}
+        git commit -m "Update version to ${{ steps.version_compute.outputs.version }}"
+        git push
