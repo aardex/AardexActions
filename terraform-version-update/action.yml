@@ -1,6 +1,9 @@
 name: terraform-version-update
 description: Increment update and return a Terraform module version
 
+permissions:
+  contents: write
+
 inputs:
   type:
     description: "The type of version increment (major, minor, patch, release-candidate, alpha)"

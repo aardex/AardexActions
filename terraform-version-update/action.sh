@@ -40,10 +40,12 @@ done
 # Check the version provided or read from file
 if [[ -n "$VERSION_NUMBER" ]]; then
   VERSION="$VERSION_NUMBER"
+  echo "Using provided version: $VERSION"
 elif [[ -f "$VERSION_FILE" ]]; then
-  VERSION=$(cat "$VERSION_FILE" | tr -d '\n')
+  VERSION=$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.]+)?' "$VERSION_FILE" | head -n 1)
+  echo "Using version from file: $VERSION"
 else
-  echo "ERROR - No version provided and ${VERSION_FILE} not found."
+  echo "ERROR - No version provided and ${VERSION_FILE:-file} not found."
   exit 1
 fi
 
@@ -57,6 +59,8 @@ else
   echo "Invalid version format: $VERSION"
   exit 1
 fi
+
+echo "Updating the current version: $VERSION"
 
 case "$VERSION_TYPE" in
   major|version-major)
