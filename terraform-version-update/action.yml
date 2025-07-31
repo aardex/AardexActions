@@ -1,9 +1,6 @@
 name: terraform-version-update
 description: Increment update and return a Terraform module version
 
-env:
-  VERSION_FILE: "version.txt"
-
 inputs:
   type:
     description: "The type of version increment (major, minor, patch, release-candidate, alpha)"
@@ -31,16 +28,27 @@ outputs:
     description: "The new version number"
     value: ${{ steps.version_compute.outputs.version }}
 
+env:
+  VERSION_FILE: "version.txt"
+
 runs:
   using: composite
   steps:
+    - name: Set Variables
+      shell: bash
+      run: |
+        FILE="${{ inputs.version_file }}"
+        [[ -z "$FILE" ]] && FILE="${{ env.VERSION_FILE }}"
+        [[ ! -f "$FILE" ]] && echo "${{ inputs.version }}" > "$FILE"
+
+        echo "Using version file: $FILE"
+        echo "VERSION_FILE=$FILE" >> "$GITHUB_ENV"
+        
     - name: Compute new version  
       id: version_compute
       shell: bash
       run: |
-        VERSION_FILE="${{ inputs.version_file }}"
-        VERSION_FILE="${VERSION_FILE:-${{ env.VERSION_FILE }}}"
-        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "$VERSION_FILE"
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ env.VERSION_FILE }}"
 
     - name: Show new version
       shell: bash
