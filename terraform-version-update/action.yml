@@ -5,16 +5,6 @@ env:
   VERSION_FILE: "version.txt"
 
 inputs:
-  version:
-    description: The current version of the Terraform module (optional if version file exists)
-    type: string
-    default: ''
-
-  version_file:
-    description: The file containing the current version (default: version.txt)
-    type: string
-    default: ''
-
   type:
     description: The type of version increment (major, minor, patch, release-candidate, alpha)
     required: true
@@ -25,7 +15,16 @@ inputs:
       - patch
       - release-candidate
       - alpha
-    default: alpha
+      
+  version:
+    description: The current version of the Terraform module (optional if version file exists)
+    type: string
+    default: ''
+
+  version_file:
+    description: The file containing the current version (default: version.txt)
+    type: string
+    default: ''
 
 outputs:
   version:
