@@ -39,7 +39,8 @@ runs:
       shell: bash
       run: |
         VERSION_FILE="${{ inputs.version_file }}"
-        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${VERSION_FILE:-${{ env.VERSION_FILE }}}"
+        VERSION_FILE="${VERSION_FILE:-${{ env.VERSION_FILE }}}"
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file $VERSION_FILE
 
     - name: Show new version
       shell: bash
