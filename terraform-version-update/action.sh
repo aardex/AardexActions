@@ -43,7 +43,7 @@ if [[ -n "$VERSION_NUMBER" ]]; then
 elif [[ -f "$VERSION_FILE" ]]; then
   VERSION=$(cat "$VERSION_FILE" | tr -d '\n')
 else
-  echo "ERROR - No version provided and ${VERSION_FILE:-file} not found."
+  echo "ERROR - No version provided and ${VERSION_FILE} not found."
   exit 1
 fi
 
