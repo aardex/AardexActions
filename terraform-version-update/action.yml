@@ -6,7 +6,7 @@ env:
 
 inputs:
   type:
-    description: The type of version increment (major, minor, patch, release-candidate, alpha)
+    description: "The type of version increment (major, minor, patch, release-candidate, alpha)"
     required: true
     type: choice
     options:
@@ -17,12 +17,12 @@ inputs:
       - alpha
 
   version:
-    description: The current version of the Terraform module (optional if version file exists)
+    description: "The current version of the Terraform module (optional if version file exists)"
     type: string
     default: ''
 
   version_file:
-    description: The file containing the current version (default: version.txt)
+    description: "The file containing the current version (default: version.txt)"
     type: string
     default: ''
 
@@ -40,7 +40,7 @@ runs:
       run: |
         VERSION_FILE="${{ inputs.version_file }}"
         VERSION_FILE="${VERSION_FILE:-${{ env.VERSION_FILE }}}"
-        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file $VERSION_FILE
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "$VERSION_FILE"
 
     - name: Show new version
       shell: bash
