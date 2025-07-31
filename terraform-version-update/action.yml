@@ -1,5 +1,5 @@
 name: terraform-version-update
-description: Increment, upcate and return a Terraform module version
+description: Increment update and return a Terraform module version
 
 env:
   VERSION_FILE: "version.txt"
