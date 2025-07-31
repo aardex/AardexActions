@@ -28,7 +28,7 @@ inputs:
 
 outputs:
   version:
-    description: The new version number
+    description: "The new version number"
     value: ${{ steps.version_compute.outputs.version }}
 
 runs:

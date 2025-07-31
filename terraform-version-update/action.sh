@@ -81,18 +81,16 @@ case "$VERSION_TYPE" in
     ;;
   
   alpha)
+    BRANCH_ID=""
     if [[ "$BRANCH_NAME" =~ ([0-9]+) ]]; then
-      BRANCH_ID="${BASH_REMATCH[1]}"
-    else
-      echo "ERROR - Unable to extract branch ID from name: $BRANCH_NAME"
-      exit 1
+      BRANCH_ID=".${BASH_REMATCH[1]}"
     fi
         
     if [[ "$SUFFIX" =~ ${TAG_ALPHA}\.${BRANCH_ID}\.([0-9]+) ]]; then
       N="${BASH_REMATCH[1]}"
-      NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}.${BRANCH_ID}.$((N + 1))"
+      NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}${BRANCH_ID}.$((N + 1))"
     else
-      NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}.${BRANCH_ID}.1"
+      NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}${BRANCH_ID}.1"
     fi
     ;;
 
