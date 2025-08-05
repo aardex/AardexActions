@@ -1,5 +1,5 @@
 name: terraform-docs-index
-description: Create table of content for Terraform Documentation
+description: "Create table of content for Terraform Documentation"
 
 inputs:
   directory:

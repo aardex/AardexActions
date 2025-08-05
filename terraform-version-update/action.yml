@@ -1,12 +1,12 @@
 name: terraform-version-update
-description: Increment, upcate and return a Terraform module version
+description: Increment update and return a Terraform module version
 
-env:
-  VERSION_FILE: "version.txt"
+permissions:
+  contents: write
 
 inputs:
   type:
-    description: The type of version increment (major, minor, patch, release-candidate, alpha)
+    description: "The type of version increment (major, minor, patch, release-candidate, alpha)"
     required: true
     type: choice
     options:
@@ -15,20 +15,20 @@ inputs:
       - patch
       - release-candidate
       - alpha
-      
+
   version:
-    description: The current version of the Terraform module (optional if version file exists)
+    description: "The current version of the Terraform module (optional if version file exists)"
     type: string
     default: ''
 
   version_file:
-    description: The file containing the current version (default: version.txt)
+    description: "The file containing the current version (default: version.txt)"
     type: string
-    default: ''
+    default: "version.txt"
 
 outputs:
   version:
-    description: The new version number
+    description: "The new version number"
     value: ${{ steps.version_compute.outputs.version }}
 
 runs:
@@ -38,7 +38,7 @@ runs:
       id: version_compute
       shell: bash
       run: |
-        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file || env.VERSION_FILE }}"
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file }}"
 
     - name: Show new version
       shell: bash
@@ -48,13 +48,13 @@ runs:
     - name: Update version file
       shell: bash
       run: |
-        echo "${{ steps.version_compute.outputs.version }}" > ${{ env.VERSION_FILE }}
+        echo "${{ steps.version_compute.outputs.version }}" > ${{ inputs.version_file }}
 
     - name: Commit Version Changes
       shell: bash
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
-        git add ${{ env.VERSION_FILE }}
+        git add ${{ inputs.version_file }}
         git commit -m "Update version to ${{ steps.version_compute.outputs.version }}"
         git push
