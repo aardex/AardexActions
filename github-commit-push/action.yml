@@ -1,0 +1,29 @@
+name: github-commit-push
+description: Commit and push changes to the GitHub repository
+
+permissions:
+  contents: write
+
+inputs:
+  message:
+    description: "Commit message to use for the changes"
+    type: string
+    default: "Update source"
+
+  github-token:
+    description: "GitHub token for authentication"
+    type: string
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Commit and Push Documentation Changes
+        shell: bash
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add . || echo "Nothing to add!"
+          git diff --cached --quiet || git commit -m "${{ inputs.commit-message }}"
+          [ -n "${{ inputs.github-token }}" ] && git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
+          git push || echo "Nothing to push!"
