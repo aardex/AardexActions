@@ -26,6 +26,10 @@ inputs:
     type: string
     default: "version.txt"
 
+  github-token:
+    description: "GitHub token for authentication"
+    required: true
+
 outputs:
   version:
     description: "The new version number"
@@ -34,7 +38,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Compute new version  
+    - name: Compute new version
       id: version_compute
       shell: bash
       run: |
@@ -49,12 +53,3 @@ runs:
       shell: bash
       run: |
         echo "${{ steps.version_compute.outputs.version }}" > ${{ inputs.version_file }}
-
-    - name: Commit Version Changes
-      shell: bash
-      run: |
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git add ${{ inputs.version_file }}
-        git commit -m "Update version to ${{ steps.version_compute.outputs.version }}"
-        git push
