@@ -26,10 +26,6 @@ inputs:
     type: string
     default: "version.txt"
 
-  github-token:
-    description: "GitHub token for authentication"
-    required: true
-
 outputs:
   version:
     description: "The new version number"
