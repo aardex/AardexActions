@@ -16,11 +16,12 @@ runs:
     - name: Commit and Push Documentation Changes
       shell: bash
       run: |
-        if [ -n "${{ inputs.github-token }}" ]; then
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git config --global user.password "${{ inputs.github-token }}"
-        fi 
+        # if [ -n "${{ inputs.github-token }}" ]; then
+        #   echo "Use \"Github Action User\"."
+        #   git config --global user.email "actions@github.com"
+        #   git config --global user.name "GitHub Actions"
+        #   git config --global user.password "${{ inputs.github-token }}"
+        # fi 
         
         git diff --quiet && git diff --cached --quiet && { echo "No changes to commit."; exit 0; }
         git add . && git commit -m "${{ inputs.message }}" && git push || echo "Nothing to push!"
