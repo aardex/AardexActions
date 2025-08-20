@@ -60,42 +60,50 @@ else
   exit 1
 fi
 
-echo "Updating the current version: $VERSION"
+echo "Updating the current version: $VERSION ($MAJOR / $MINOR / $PATCH / $SUFFIX)"
 
 case "$VERSION_TYPE" in
   major|version-major)
     NEW_VERSION="$((MAJOR + 1)).0.0"
+    echo "Updated MAJOR version: $VERSION -> $NEW_VERSION"
     ;;
   
   minor|version-minor)
     NEW_VERSION="$MAJOR.$((MINOR + 1)).0"
+    echo "Updated MINOR version: $VERSION -> $NEW_VERSION"
     ;;
   
   patch|version-patch)
     NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+    echo "Updated PATCH version: $VERSION -> $NEW_VERSION"
     ;;
   
   release-candidate|rc)
-    if [[ "$SUFFIX" =~ ${TAG_RC}([0-9]+) ]]; then
+    if [[ "$SUFFIX" =~ ${TAG_RC}.*([0-9]+)$ ]]; then
       N="${BASH_REMATCH[1]}"
       NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_RC}.$((N + 1))"
     else
       NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_RC}.1"
     fi
+    echo "Updated RC version: $VERSION -> $NEW_VERSION"
     ;;
   
   alpha)
     BRANCH_ID=""
+    BRANCH_MATCH=""
     if [[ "$BRANCH_NAME" =~ ([0-9]+) ]]; then
       BRANCH_ID=".${BASH_REMATCH[1]}"
+      BRANCH_MATCH="\.${BASH_REMATCH[1]}"
     fi
-        
-    if [[ "$SUFFIX" =~ ${TAG_ALPHA}\.${BRANCH_ID}\.([0-9]+) ]]; then
+
+    if [[ "$SUFFIX" =~ ${TAG_ALPHA}${BRANCH_MATCH}.*\.([0-9]+)$ ]]; then
       N="${BASH_REMATCH[1]}"
       NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}${BRANCH_ID}.$((N + 1))"
     else
       NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}-${TAG_ALPHA}${BRANCH_ID}.1"
     fi
+
+    echo "Updated ALPHA version: $VERSION -> $NEW_VERSION"
     ;;
 
   *)
@@ -104,7 +112,6 @@ case "$VERSION_TYPE" in
     ;;
 esac
 
-echo -e "Updated version: $VERSION -> $NEW_VERSION"
 if [[ -n "$GITHUB_OUTPUT" ]]; then
   echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
 fi

@@ -7,7 +7,7 @@ inputs:
     default: "Update source"
 
   github-token:
-    description: "GitHub token for authentication"    
+    description: "GitHub token for authentication"   
     default: ''
 
 runs:
@@ -18,7 +18,11 @@ runs:
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
-        [ -n "${{ inputs.github-token }}" ] && git remote set-url origin https://x-access-token:${{ inputs.github-token }}@github.com/${{ github.repository }}.git
+        
+        if [ -n "${{ inputs.github-token }}" ]; then
+          echo "Use \"Github Action User\"."
+          git config --global user.password "${{ inputs.github-token }}"
+        fi 
         
         git diff --quiet && git diff --cached --quiet && { echo "No changes to commit."; exit 0; }
         git add . && git commit -m "${{ inputs.message }}" && git push || echo "Nothing to push!"
