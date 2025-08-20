@@ -40,11 +40,6 @@ runs:
       run: |
         bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file }}"
 
-    - name: Show new version
-      shell: bash
-      run: |
-        echo "Updated version: ${{ inputs.version }} -> ${{ steps.version_compute.outputs.version }}"
-
     - name: Update version file
       shell: bash
       run: |
