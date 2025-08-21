@@ -122,5 +122,4 @@ runs:
         az containerapp update \
           --name ${{ inputs.app-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.resource-group }} \
-          --image ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }} \
-          --registry-server ${{ inputs.acr-registry }}
+          --image ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
