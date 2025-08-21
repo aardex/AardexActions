@@ -104,7 +104,7 @@ runs:
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
+        image-ref: ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
