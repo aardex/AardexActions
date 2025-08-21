@@ -37,6 +37,10 @@ inputs:
   resource-group:
     required: true
     description: "Azure Resource Group name"
+  dockerfile-path:
+    required: false
+    default: '.'
+    description: "Path to the Dockerfile"
 
 runs:
   using: composite
@@ -83,7 +87,7 @@ runs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: ${{ inputs.dockerfile-path }}
         push: true
         tags: |
           ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
