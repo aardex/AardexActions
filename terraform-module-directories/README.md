@@ -1,7 +1,7 @@
 # Terraform Module Directories
 
 Return the list of directories with Terraform modules for the project.
-It's use full to apply Terraform validation or generating Terraform Docs.
+It's usefull to apply Terraform validation or generating Terraform Docs.
 
 ## Usage
 
@@ -22,5 +22,5 @@ jobs:
         id: module-directories
         uses: aardex/AardexActions/terraform-module-directories@main
         with:
-          exclude_directories: 'sample'
+          exclude_directories: '*/sample/*'
 ```
