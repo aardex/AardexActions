@@ -95,6 +95,8 @@ runs:
           ${{ inputs.acr-registry }}/${{ inputs.app-name }}:latest
         cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache
         cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache,mode=max
+        build-args: |
+          NUGET_PAT=${{ inputs.github-token }}     
         
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
