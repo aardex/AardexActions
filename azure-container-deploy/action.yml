@@ -11,6 +11,9 @@ inputs:
   app-name:
     required: true
     description: "Name of the Azure Container App"
+  image-name:
+    required: true
+    description: "Name of the Docker image"
   version:
     required: false
     description: "Version tag for the Docker image"
@@ -37,6 +40,10 @@ inputs:
   resource-group:
     required: true
     description: "Azure Resource Group name"
+  dockerfile-path:
+    required: false
+    default: '.'
+    description: "Path to the Dockerfile"
 
 runs:
   using: composite
@@ -84,17 +91,20 @@ runs:
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: ${{ inputs.dockerfile-path }}/Dockerfile
         push: true
         tags: |
-          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
-          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:latest
-        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache
-        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache,mode=max
+          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
+          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:latest
+        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache,mode=max
+        build-args: |
+          NUGET_PAT=${{ inputs.github-token }}     
         
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
+        image-ref: ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -112,5 +122,4 @@ runs:
         az containerapp update \
           --name ${{ inputs.app-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.resource-group }} \
-          --image ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }} \
-          --registry-server ${{ inputs.acr-registry }}
+          --image ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
