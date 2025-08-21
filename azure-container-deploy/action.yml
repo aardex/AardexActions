@@ -11,6 +11,9 @@ inputs:
   app-name:
     required: true
     description: "Name of the Azure Container App"
+  image-name:
+    required: true
+    description: "Name of the Docker image"
   version:
     required: false
     description: "Version tag for the Docker image"
@@ -91,10 +94,10 @@ runs:
         file: ${{ inputs.dockerfile-path }}/Dockerfile
         push: true
         tags: |
-          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
-          ${{ inputs.acr-registry }}/${{ inputs.app-name }}:latest
-        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache
-        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.app-name }}:buildcache,mode=max
+          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
+          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:latest
+        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}     
         
