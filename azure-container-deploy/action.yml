@@ -87,7 +87,8 @@ runs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ${{ inputs.dockerfile-path }}
+        context: .
+        file: ${{ inputs.dockerfile-path }}/Dockerfile
         push: true
         tags: |
           ${{ inputs.acr-registry }}/${{ inputs.app-name }}:${{ inputs.version }}
