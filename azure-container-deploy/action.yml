@@ -8,7 +8,7 @@ inputs:
   azure-environment:
     required: true
     description: "Azure environment to use"
-  app-name:
+  ca-name:
     required: true
     description: "Name of the Azure Container App"
   image-name:
@@ -28,21 +28,21 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
-  acr-registry:
+  acr-login-server:
     required: true
-    description: "Azure Container Registry name"
+    description: "Azure Container Server Name"
   acr-username:
     required: true
     description: "Azure Container Registry Username"
   acr-password:
     required: true
     description: "Azure Container Registry Password"
-  resource-group:
+  ca-resource-group:
     required: true
-    description: "Azure Resource Group name"
-  dockerfile-path:
+    description: "Resource group for Azure Container App"
+  docker-directory:
     required: false
-    default: '.'
+    default: 'docker'
     description: "Path to the Dockerfile"
   platforms:
     required: false
@@ -98,7 +98,7 @@ runs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ${{ inputs.dockerfile-path }}/Dockerfile
+        file: ${{ inputs.docker-directory }}/Dockerfile
         push: true
         platforms: ${{ inputs.platforms }}
         tags: |
@@ -123,11 +123,11 @@ runs:
       with:
         creds: ${{ inputs.azure-credentials }}
 
-    - name: Deploy to Azure Container Apps
+    - name: Update Azure Container Apps
       shell: bash
       run: |
         az config set extension.use_dynamic_install=yes_without_prompt
         az containerapp update \
-          --name ${{ inputs.app-name }}-${{ inputs.azure-environment }} \
-          --resource-group ${{ inputs.resource-group }} \
+          --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
+          --ca-resource-group ${{ inputs.ca-resource-group }} \
           --image ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
