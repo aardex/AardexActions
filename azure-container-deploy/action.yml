@@ -44,6 +44,10 @@ inputs:
     required: false
     default: '.'
     description: "Path to the Dockerfile"
+  platforms:
+    required: false
+    default: 'linux/amd64,linux/arm64'
+    description: "Comma-separated list of target platforms for multi-arch build"
 
 runs:
   using: composite
@@ -78,29 +82,33 @@ runs:
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Login to Azure Container Registry
-      uses: azure/docker-login@v1
+      uses: azure/docker-login@v2
       with:
         login-server: ${{ inputs.acr-registry }}
         username: ${{ inputs.acr-username }}
         password: ${{ inputs.acr-password }}
 
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
-    - name: Build and push Docker image
+
+    - name: Build and push Docker image (multi-arch)
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ${{ inputs.dockerfile-path }}/Dockerfile
         push: true
+        platforms: ${{ inputs.platforms }}
         tags: |
           ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
           ${{ inputs.acr-registry }}/${{ inputs.image-name }}:latest
         cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache
         cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
-          NUGET_PAT=${{ inputs.github-token }}     
-        
+          NUGET_PAT=${{ inputs.github-token }}
+
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
       with:
