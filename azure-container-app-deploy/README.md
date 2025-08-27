@@ -1,4 +1,4 @@
-# Deploy Azure Dotnet Function Action
+# Deploy Docker to Container App
 
 This GitHub Action automates the build and deployment of a .NET Azure Function to your specified Azure environment,
 supporting both standard and flex consumption plans.
@@ -9,7 +9,6 @@ supporting both standard and flex consumption plans.
 |---------------------|----------------------------------------------------------|
 | `environment`       | Target environment for deployment                        |
 | `azure-environment` | Azure environment to use                                 |
-| `project`           | Project path to deploy                                   |
 | `container-name`    | Name of the Container App                                |
 | `image-name`        | Name of the Docker Image                                 |
 | `github-token`      | GitHub token for authentication                          |
@@ -46,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Docker to Azure Container Apps to ${{ inputs.environment }}
-        uses: aardex/AardexActions/azure-container-deploy@main
+        uses: aardex/AardexActions/azure-container-app-deploy@main
         with:
           environment: ${{ inputs.environment }}
           azure-environment: ${{ vars.AZ_ENV }}
