@@ -46,7 +46,7 @@ inputs:
     description: "Path to the Dockerfile"
   platforms:
     required: false
-    default: 'linux/amd64,linux/arm64'
+    default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
 
 runs:
