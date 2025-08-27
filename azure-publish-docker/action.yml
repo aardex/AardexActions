@@ -78,7 +78,7 @@ runs:
     - name: Login to Azure Container Registry
       uses: azure/docker-login@v2
       with:
-        login-server: ${{ inputs.acr-registry }}
+        login-server: ${{ inputs.acr-login-server }}
         username: ${{ inputs.acr-username }}
         password: ${{ inputs.acr-password }}
 
@@ -96,17 +96,17 @@ runs:
         push: true
         platforms: ${{ inputs.platforms }}
         tags: |
-          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
-          ${{ inputs.acr-registry }}/${{ inputs.image-name }}:latest
-        cache-from: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache
-        cache-to: type=registry,ref=${{ inputs.acr-registry }}/${{ inputs.image-name }}:buildcache,mode=max
+          ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
+          ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:latest
+        cache-from: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache
+        cache-to: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
 
     - name: Scan Docker image for vulnerabilities
       uses: aquasecurity/trivy-action@0.28.0
       with:
-        image-ref: ${{ inputs.acr-registry }}/${{ inputs.image-name }}:${{ inputs.version }}
+        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
