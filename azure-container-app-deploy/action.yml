@@ -1,0 +1,83 @@
+name: Deploy Docker to Container App
+description: Build & Deploy a Docker application to Azure Container Apps
+
+inputs:
+  environment:
+    required: true
+    description: "Target environment for deployment"
+  azure-environment:
+    required: true
+    description: "Azure environment to use"
+  ca-name:
+    required: true
+    description: "Name of the Azure Container App"
+  image-name:
+    required: true
+    description: "Name of the Docker image"
+  version:
+    required: false
+    description: "Version tag for the Docker image"
+    default: 'latest'
+  config-file-path:
+    required: false
+    default: ''
+    description: "Path to configuration file. Only required for .Net projects."
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+  azure-credentials:
+    required: true
+    description: "Azure credentials for authentication"
+  acr-login-server:
+    required: true
+    description: "Azure Container Server Name"
+  acr-username:
+    required: true
+    description: "Azure Container Registry Username"
+  acr-password:
+    required: true
+    description: "Azure Container Registry Password"
+  ca-resource-group:
+    required: true
+    description: "Resource group for Azure Container App"
+  docker-directory:
+    required: false
+    default: 'docker'
+    description: "Path to the Dockerfile"
+  platforms:
+    required: false
+    default: 'linux/amd64'
+    description: "Comma-separated list of target platforms for multi-arch build"
+
+runs:
+  using: composite
+  steps:
+    - name: Build and push Docker image
+      uses: aardex/AardexActions/azure-publish-docker@main
+      with:
+        environment: ${{ inputs.environment }}
+        azure-environment: ${{ inputs.azure-environment }}
+        image-name: ${{ inputs.image-name }}
+        version: ${{ inputs.version }}
+        config-file-path: ${{ inputs.config-file-path }}
+        github-token: ${{ inputs.github-token }}
+        azure-credentials: ${{ inputs.azure-credentials }}
+        acr-login-server: ${{ inputs.acr-login-server }}
+        acr-username: ${{ inputs.acr-username }}
+        acr-password: ${{ inputs.acr-password }}
+        docker-directory: ${{ inputs.docker-directory }}
+        platforms: ${{ inputs.platforms }}
+
+    - name: Login to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ inputs.azure-credentials }}
+
+    - name: Update Azure Container Apps
+      shell: bash
+      run: |
+        az config set extension.use_dynamic_install=yes_without_prompt
+        az containerapp update \
+          --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
+          --resource-group ${{ inputs.ca-resource-group }} \
+          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
