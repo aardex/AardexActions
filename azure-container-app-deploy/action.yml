@@ -53,7 +53,7 @@ runs:
   using: composite
   steps:
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-docker@main
+      uses: aardex/AardexActions/azure-publish-docker@MMA-1662-bis
       with:
         environment: ${{ inputs.environment }}
         azure-environment: ${{ inputs.azure-environment }}
