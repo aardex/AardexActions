@@ -74,8 +74,14 @@ case "$VERSION_TYPE" in
     ;;
   
   patch|version-patch)
-    NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-    echo "Updated PATCH version: $VERSION -> $NEW_VERSION"
+    # If the current version is a pre-release (rc/alpha), finalize it by dropping the suffix
+    if [[ -n "$SUFFIX" && "$SUFFIX" =~ ^-(${TAG_RC}|${TAG_ALPHA})(\.|$) ]]; then
+      NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+      echo "Finalize pre-release to STABLE (drop suffix): $VERSION -> $NEW_VERSION"
+    else
+      NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+      echo "Updated PATCH version: $VERSION -> $NEW_VERSION"
+    fi
     ;;
   
   release-candidate|rc)
