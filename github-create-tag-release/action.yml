@@ -30,7 +30,6 @@ runs:
         token: ${{ inputs.github-token }}
 
     - name: Create tag and release
-      shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       uses: softprops/action-gh-release@v2
