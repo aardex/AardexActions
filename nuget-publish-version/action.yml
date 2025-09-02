@@ -1,0 +1,124 @@
+name: Publish nugVersion
+description: Increment and publish a release version of a nuget
+
+inputs:
+  project:
+    required: true
+    description: "Path to .csproj to publish"
+  dotnet-version:
+    required: false
+    description: ".NET SDK version to use"
+    default: "8.x"
+  type:
+    required: true
+    description: "Type of version to publish"
+  version:
+    required: false
+    description: "Version to publish. Used only when type is manual"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+
+outputs:
+  version:
+    description: "The generated release version"
+    value: ${{ steps.determine_version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set environment variables
+      id: setup_vars
+      shell: bash
+      run: |
+        echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_OUTPUT
+        echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_OUTPUT
+        echo "AARDEX_ACTIONS_BRANCH=main" >> $GITHUB_OUTPUT
+
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Build Project Variables
+      id: project_vars
+      shell: bash
+      run: |
+        cd "${{ inputs.project }}"
+        echo "PROJECT_PATH=$(pwd)" >> "$GITHUB_OUTPUT"
+        echo "PROJECT_NAME=$(basename $(pwd))" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Determine version
+      id: determine_version
+      shell: bash
+      run: |
+        if [[ "${{ inputs.type }}" == "alpha" ]]; then
+          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py alpha --branch "${{ github.ref }}")
+        elif [[ "${{ inputs.type }}" == "release-candidate" ]]; then
+          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py rc)
+        elif [[ "${{ inputs.type }}" == "release" ]]; then
+          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py release)
+        elif [[ "${{ inputs.type }}" == "manual" ]]; then
+          version=${{ inputs.version }}
+        fi
+        echo "version=$version" >> $GITHUB_OUTPUT
+
+    - name: Update package version
+      shell: bash
+      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
+
+    - name: Verify and Add RepositoryUrl in .csproj
+      shell: bash
+      run: |
+        CSPROJ_PATH="${{ steps.project_vars.outputs.PROJECT_PATH }}/${{ steps.project_vars.outputs.PROJECT_NAME }}.csproj"
+        REPO_URL="https://github.com/${{ github.repository }}"
+        
+        if grep -q "<RepositoryUrl>" "$CSPROJ_PATH"; then
+          echo "RepositoryUrl already present in $CSPROJ_PATH"
+        else
+          echo "RepositoryUrl and RepositoryType added to $CSPROJ_PATH"
+          sed -i '/<\/PropertyGroup>/i \ \ \ \ <RepositoryUrl>'"$REPO_URL"'</RepositoryUrl>\n\ \ \ \ <RepositoryType>git</RepositoryType>' "$CSPROJ_PATH"
+        fi
+
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Add GitHub source
+      shell: bash
+      run: |
+        dotnet nuget remove source github
+        dotnet nuget add source --username Doublon --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
+
+    - name: Build & Test & Pack nuget
+      id: build_pack
+      shell: bash
+      run: |
+        dotnet build -c Release
+        dotnet test
+        dotnet pack -c Release --output ./output
+        echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
+      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
+
+    - name: Publish nuget
+      shell: bash
+      run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{inputs.github-token}} --source "github"
+      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
+
+    - name: Clean AardexActions
+      shell: bash
+      run: rm -rf ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
