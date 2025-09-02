@@ -1,13 +1,7 @@
-name: Publish nugVersion
+name: Release Dotnet Component
 description: Increment and publish a release version of a nuget
 
 inputs:
-  type:
-    required: true
-    description: "Type of version to publish"
-  version:
-    required: false
-    description: "Version to publish. Used only when type is manual"
   github-token:
     required: true
     description: "GitHub token for authentication"
@@ -31,8 +25,7 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-#        TODO QTU
-        ref: features/INFRA-237
+        ref: main
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
         path: AardexActions
@@ -46,15 +39,7 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        if [[ "${{ inputs.type }}" == "alpha" ]]; then
-          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py alpha --branch "${{ github.ref }}")
-        elif [[ "${{ inputs.type }}" == "release-candidate" ]]; then
-          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py rc)
-        elif [[ "${{ inputs.type }}" == "release" ]]; then
-          version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py release)
-        elif [[ "${{ inputs.type }}" == "manual" ]]; then
-          version=${{ inputs.version }}
-        fi
+        version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-version.py release)
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
@@ -68,7 +53,7 @@ runs:
     - name: Commit Changes
       uses: aardex/AardexActions/github-commit-push@main
       with:
-        message: Upgrate to ${{ steps.determine_version.outputs.version }}
+        message: Release ${{ steps.determine_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
 
     - name: Create Release
