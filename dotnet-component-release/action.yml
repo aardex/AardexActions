@@ -61,6 +61,10 @@ runs:
       shell: bash
       run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
 
+    - name: Clean AardexActions
+      shell: bash
+      run: rm -rf ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
+
     - name: Commit Changes
       uses: aardex/AardexActions/github-commit-push@main
       with:
@@ -72,7 +76,3 @@ runs:
       with:
         version: ${{ steps.determine_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
-
-    - name: Clean AardexActions
-      shell: bash
-      run: rm -rf ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}
