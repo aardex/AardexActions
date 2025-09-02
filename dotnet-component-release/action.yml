@@ -31,7 +31,8 @@ runs:
     - name: Checkout AardexActions
       uses: actions/checkout@v4
       with:
-        ref: main
+#        TODO QTU
+        ref: features/INFRA-237
         repository: aardex/AardexActions
         token: ${{ inputs.github-token }}
         path: AardexActions
