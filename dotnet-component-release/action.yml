@@ -1,14 +1,7 @@
-name: Publish Nuget Version
+name: Publish nugVersion
 description: Increment and publish a release version of a nuget
 
 inputs:
-  project:
-    required: true
-    description: "Path to .csproj to publish"
-  dotnet-version:
-    required: false
-    description: ".NET SDK version to use"
-    default: "8.x"
   type:
     required: true
     description: "Type of version to publish"
@@ -18,11 +11,6 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-
-outputs:
-  version:
-    description: "The generated release version"
-    value: ${{ steps.determine_version.outputs.version }}
 
 runs:
   using: composite
@@ -48,14 +36,6 @@ runs:
         token: ${{ inputs.github-token }}
         path: AardexActions
 
-    - name: Build Project Variables
-      id: project_vars
-      shell: bash
-      run: |
-        cd "${{ inputs.project }}"
-        echo "PROJECT_PATH=$(pwd)" >> "$GITHUB_OUTPUT"
-        echo "PROJECT_NAME=$(basename $(pwd))" >> "$GITHUB_OUTPUT"
-
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
       with:
@@ -80,44 +60,17 @@ runs:
       shell: bash
       run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
 
-    - name: Verify and Add RepositoryUrl in .csproj
-      shell: bash
-      run: |
-        CSPROJ_PATH="${{ steps.project_vars.outputs.PROJECT_PATH }}/${{ steps.project_vars.outputs.PROJECT_NAME }}.csproj"
-        REPO_URL="https://github.com/${{ github.repository }}"
-        
-        if grep -q "<RepositoryUrl>" "$CSPROJ_PATH"; then
-          echo "RepositoryUrl already present in $CSPROJ_PATH"
-        else
-          echo "RepositoryUrl and RepositoryType added to $CSPROJ_PATH"
-          sed -i '/<\/PropertyGroup>/i \ \ \ \ <RepositoryUrl>'"$REPO_URL"'</RepositoryUrl>\n\ \ \ \ <RepositoryType>git</RepositoryType>' "$CSPROJ_PATH"
-        fi
-
-    - name: Setup dotnet
-      uses: actions/setup-dotnet@v4
+    - name: Commit Changes
+      uses: aardex/AardexActions/github-commit-push@main
       with:
-        dotnet-version: ${{ inputs.dotnet-version }}
+        message: Upgrate to ${{ steps.determine_version.outputs.version }}
+        github-token: ${{ inputs.github-token }}
 
-    - name: Add GitHub source
-      shell: bash
-      run: |
-        dotnet nuget remove source github
-        dotnet nuget add source --username Doublon --password ${{ inputs.github-token }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/aardex/index.json"
-
-    - name: Build & Test & Pack nuget
-      id: build_pack
-      shell: bash
-      run: |
-        dotnet build -c Release
-        dotnet test
-        dotnet pack -c Release --output ./output
-        echo "PACKAGE_NAME=$(ls ./output/*.nupkg)" >> "$GITHUB_OUTPUT"
-      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
-
-    - name: Publish nuget
-      shell: bash
-      run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{inputs.github-token}} --source "github"
-      working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
+    - name: Create Release
+      uses: aardex/AardexActions/github-create-tag-release@main
+      with:
+        version: ${{ steps.determine_version.outputs.version }}
+        github-token: ${{ inputs.github-token }}
 
     - name: Clean AardexActions
       shell: bash
