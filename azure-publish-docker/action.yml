@@ -36,28 +36,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v5
-      with:
-        token: ${{ inputs.github-token }}
-
     - name: Login to Azure Container Registry
       uses: azure/docker-login@v2
       with:
         login-server: ${{ inputs.acr-login-server }}
         username: ${{ inputs.acr-username }}
         password: ${{ inputs.acr-password }}
-
-    - name: Debug Docker context
-      shell: bash
-      run: |
-        echo "=== Current directory structure ==="
-        pwd
-        ls -R
-        echo "=== Themes dist content ==="
-        ls -la themes/dist/
-        echo "=== Docker context content ==="
-        find . -type f
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
