@@ -49,6 +49,7 @@ runs:
         password: ${{ inputs.acr-password }}
 
     - name: Debug Docker context
+      shell: bash
       run: |
         echo "=== Current directory structure ==="
         pwd
