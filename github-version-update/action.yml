@@ -1,0 +1,34 @@
+name: Update version.txt file
+description: Increment and update the root version.txt file
+
+inputs:
+  type:
+    required: true
+    description: "The type of version increment <major | minor | patch | release | release-candidate | alpha>"
+
+  version:
+    description: "The current version of the Terraform module (optional if version file exists)"
+    default: ''
+
+  version_file:
+    description: "The file containing the current version (default: version.txt)"
+    default: "version.txt"
+
+outputs:
+  version:
+    description: "The new version number"
+    value: ${{ steps.version_compute.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute new version
+      id: version_compute
+      shell: bash
+      run: |
+        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file }}"
+
+    - name: Update version file
+      shell: bash
+      run: |
+        echo "${{ steps.version_compute.outputs.version }}" > ${{ inputs.version_file }}
