@@ -1,4 +1,4 @@
-name: Deploy Docker to Container App
+name: Azure deploy dotnet Docker
 description: Build & Deploy a Docker application to Azure Container Apps
 
 inputs:
@@ -8,9 +8,6 @@ inputs:
   azure-environment:
     required: true
     description: "Azure environment to use"
-  ca-name:
-    required: true
-    description: "Name of the Azure Container App"
   image-name:
     required: true
     description: "Name of the Docker image"
@@ -37,9 +34,6 @@ inputs:
   acr-password:
     required: true
     description: "Azure Container Registry Password"
-  ca-resource-group:
-    required: true
-    description: "Resource group for Azure Container App"
   docker-directory:
     required: false
     default: 'docker'
@@ -52,11 +46,39 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-dotnet-docker@main
+    - name: Checkout repository
+      uses: actions/checkout@v5
       with:
-        environment: ${{ inputs.environment }}
-        azure-environment: ${{ inputs.azure-environment }}
+        token: ${{ inputs.github-token }}
+
+    - name: Checkout AardexActions
+      uses: actions/checkout@v5
+      with:
+        ref: main
+        repository: aardex/AardexActions
+        token: ${{ inputs.github-token }}
+        path: AardexActions
+
+    - name: Set up Python 3.x
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install python dependencies
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: pip install -r AardexActions/scripts/requirements.txt
+
+    - name: Setup config
+      if: ${{ inputs.config-file-path != '' }}
+      shell: bash
+      run: |
+        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+
+    - name: Build and push Docker image
+#      Todo QTU version
+      uses: aardex/AardexActions/azure-publish-docker@features/INFRA-237
+      with:
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
@@ -67,17 +89,3 @@ runs:
         acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
-
-    - name: Login to Azure
-      uses: azure/login@v2
-      with:
-        creds: ${{ inputs.azure-credentials }}
-
-    - name: Update Azure Container Apps
-      shell: bash
-      run: |
-        az config set extension.use_dynamic_install=yes_without_prompt
-        az containerapp update \
-          --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
-          --resource-group ${{ inputs.ca-resource-group }} \
-          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
