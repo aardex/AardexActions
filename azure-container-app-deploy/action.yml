@@ -53,7 +53,8 @@ runs:
   using: composite
   steps:
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-dotnet-docker@main
+#      TODO QTU
+      uses: aardex/AardexActions/azure-publish-dotnet-docker@features/INFRA-237
       with:
         environment: ${{ inputs.environment }}
         azure-environment: ${{ inputs.azure-environment }}
