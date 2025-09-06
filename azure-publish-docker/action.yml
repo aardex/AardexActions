@@ -32,6 +32,10 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  skip-check:
+    required: false
+    default: 'false'
+    description: "Skip vulnerability check"
 
 runs:
   using: composite
@@ -65,6 +69,7 @@ runs:
           NUGET_PAT=${{ inputs.github-token }}
 
     - name: Scan Docker image for vulnerabilities
+      if: ${{ inputs.skip-check != 'true' }}
       uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
