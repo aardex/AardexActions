@@ -71,8 +71,7 @@ runs:
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
-#      Todo QTU version
-      uses: aardex/AardexActions/azure-publish-docker@features/INFRA-237
+      uses: aardex/AardexActions/azure-publish-docker@main
       with:
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
