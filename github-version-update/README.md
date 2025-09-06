@@ -1,4 +1,4 @@
-# Terraform Versions
+# Github Version Update
 
 Retrieve and update the version number based on the input type of release.
 
@@ -26,7 +26,7 @@ jobs:
 
 ## Inputs
 
-- `type`: The type of new version: `major`, `minor`, `patch`, `release-candidate`, `alpha`.
+- `type`: The type of new version: `major`, `minor`, `patch`, `release`, release-candidate`, `alpha`.
 - `version_file`: (Optional) The path to the file with version number. Ex: `version.txt`
 - `version`: (Optional) To force the current version. Ex: `1.2.3-alpha.456.7`
 

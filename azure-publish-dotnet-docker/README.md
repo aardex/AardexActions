@@ -18,12 +18,11 @@ supporting both standard and flex consumption plans.
 
 ## 📝 Optional Inputs
 
-| Input              | Description                                          | Default         |
-|--------------------|------------------------------------------------------|-----------------|
-| `config-file-path` | Path to configuration file                           | `''`            |
-| `docker-directory` | Docker directory path                                | `'docker'`      |
-| `platforms`        | Platform available for the image (separated by coma) | `'linux/amd64'` |
-| `skip-check`       | Skip vulnerability check                             | `'false'`       |
+| Input              | Description                                          | Default                      |
+|--------------------|------------------------------------------------------|------------------------------|
+| `config-file-path` | Path to configuration file                           | `''`                         |
+| `docker-directory` | Docker directory path                                | `'docker'`                   |
+| `platforms`        | Platform available for the image (separated by coma) | `'linux/amd64'`              |
 
 ## Exemple of variables
 ### azure-credentials
