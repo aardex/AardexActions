@@ -36,12 +36,12 @@ runs:
         echo "AARDEX_ACTIONS_BRANCH=main" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         token: ${{ inputs.github-token }}
 
     - name: Checkout AardexActions
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         ref: main
         repository: aardex/AardexActions

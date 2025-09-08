@@ -2,12 +2,6 @@ name: Azure deploy Docker
 description: Build & Deploy a Docker application to Azure Container Apps
 
 inputs:
-  environment:
-    required: true
-    description: "Target environment for deployment"
-  azure-environment:
-    required: true
-    description: "Azure environment to use"
   image-name:
     required: true
     description: "Name of the Docker image"
@@ -15,10 +9,6 @@ inputs:
     required: false
     description: "Version tag for the Docker image"
     default: 'latest'
-  config-file-path:
-    required: false
-    default: ''
-    description: "Path to configuration file. Only required for .Net projects."
   github-token:
     required: true
     description: "GitHub token for authentication"
@@ -42,39 +32,14 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  skip-check:
+    required: false
+    default: 'false'
+    description: "Skip vulnerability check"
 
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ inputs.github-token }}
-
-    - name: Checkout AardexActions
-      uses: actions/checkout@v4
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
-
-    - name: Set up Python 3.x
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-
-    - name: Install python dependencies
-      if: ${{ inputs.config-file-path != '' }}
-      shell: bash
-      run: pip install -r AardexActions/scripts/requirements.txt
-
-    - name: Setup config
-      if: ${{ inputs.config-file-path != '' }}
-      shell: bash
-      run: |
-        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
-
     - name: Login to Azure Container Registry
       uses: azure/docker-login@v2
       with:
@@ -104,6 +69,7 @@ runs:
           NUGET_PAT=${{ inputs.github-token }}
 
     - name: Scan Docker image for vulnerabilities
+      if: ${{ inputs.skip-check != 'true' }}
       uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
