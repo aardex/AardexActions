@@ -8,7 +8,6 @@ supporting both standard and flex consumption plans.
 | Input               | Description                                              |
 |---------------------|----------------------------------------------------------|
 | `environment`       | Target environment for deployment                        |
-| `azure-environment` | Azure environment to use                                 |
 | `image-name`        | Name of the Docker Image                                 |
 | `github-token`      | GitHub token for authentication                          |
 | `azure-credentials` | Json with Azure Managed Identity information             |
