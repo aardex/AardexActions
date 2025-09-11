@@ -1,13 +1,10 @@
-name: Azure deploy dotnet Docker
+name: Azure Deploy Dotnet Docker
 description: Build & Deploy a Docker application to Azure Container Apps
 
 inputs:
   environment:
     required: true
     description: "Target environment for deployment"
-  azure-environment:
-    required: true
-    description: "Azure environment to use"
   image-name:
     required: true
     description: "Name of the Docker image"
@@ -42,6 +39,10 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  skip-check:
+    required: false
+    default: 'false'
+    description: "Skip vulnerability check"
 
 runs:
   using: composite
@@ -75,7 +76,6 @@ runs:
       with:
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
-        config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
         azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
@@ -83,3 +83,4 @@ runs:
         acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
+        skip-check: ${{ inputs.skip-check }}

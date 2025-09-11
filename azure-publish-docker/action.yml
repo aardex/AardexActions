@@ -1,4 +1,4 @@
-name: Azure deploy Docker
+name: Azure Deploy Docker
 description: Build & Deploy a Docker application to Azure Container Apps
 
 inputs:
