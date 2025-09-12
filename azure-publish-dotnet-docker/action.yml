@@ -43,13 +43,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout AardexActions
-      uses: actions/checkout@v5
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
 
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
