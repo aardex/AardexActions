@@ -65,7 +65,7 @@ runs:
       id: extract-version
       shell: bash
       run: |
-        python3 AardexActions/scripts/azure/get_version.py --set-output
+        python3 AardexActions/scripts/nuget/get_version.py --set-output
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
