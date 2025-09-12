@@ -18,21 +18,11 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
-    - name: Checkout AardexActions
-      uses: actions/checkout@v5
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
 
     - name: Update package version
       shell: bash
-      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ inputs.version }}
+      run: python3 "${{ github.action_path }}/../scripts/nuget/update-version.py" --new-version ${{ inputs.version }}
 
-    - name: Clean AardexActions
-      shell: bash
-      run: rm -rf AardexActions
 
     - name: Commit and Push Changes
       shell: bash

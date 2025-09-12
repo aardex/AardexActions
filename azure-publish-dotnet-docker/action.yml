@@ -10,8 +10,7 @@ inputs:
     description: "Name of the Docker image"
   version:
     required: false
-    description: "Version tag for the Docker image"
-    default: 'latest'
+    description: "Version tag for the Docker image. If not provided, will use version from Directory.Build.props"
   config-file-path:
     required: false
     default: ''
@@ -19,9 +18,6 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-  azure-credentials:
-    required: true
-    description: "Azure credentials for authentication"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -44,16 +40,14 @@ inputs:
     default: 'false'
     description: "Skip vulnerability check"
 
+outputs:
+  version:
+    description: "The version used to build and push the Docker image"
+    value: ${{ steps.resolve_version.outputs.version }}
+
 runs:
   using: composite
   steps:
-    - name: Checkout AardexActions
-      uses: actions/checkout@v5
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
 
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
@@ -61,23 +55,35 @@ runs:
         python-version: '3.x'
 
     - name: Install python dependencies
-      if: ${{ inputs.config-file-path != '' }}
       shell: bash
-      run: pip install -r AardexActions/scripts/requirements.txt
+      run: pip install -r "${{ github.action_path }}/../scripts/requirements.txt"
+
+    - name: Extract version from Directory.Build.props if needed
+      if: ${{ inputs.version == '' }}
+      shell: bash
+      run: |
+        python3 "${{ github.action_path }}/../scripts/nuget/get_version.py" --set-output
+
+    - name: Resolve version
+      id: resolve_version
+      shell: bash
+      run: |
+        resolved="${{ inputs.version != '' && inputs.version || env.VERSION }}"
+        echo "Resolved version: ${resolved}"
+        echo "version=${resolved}" >> "$GITHUB_OUTPUT"
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: |
-        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+        python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
       uses: aardex/AardexActions/azure-publish-docker@main
       with:
         image-name: ${{ inputs.image-name }}
-        version: ${{ inputs.version }}
+        version: ${{ steps.resolve_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
-        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}

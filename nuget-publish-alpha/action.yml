@@ -21,26 +21,12 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Set environment variables
-      id: setup_vars
-      shell: bash
-      run: |
-        echo "AARDEX_ACTIONS_PATH=AardexActions" >> $GITHUB_OUTPUT
-        echo "AARDEX_ACTIONS_REPO=aardex/AardexActions" >> $GITHUB_OUTPUT
-        echo "AARDEX_ACTIONS_BRANCH=main" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
       uses: actions/checkout@v5
       with:
         token: ${{ inputs.github-token }}
 
-    - name: Checkout AardexActions
-      uses: actions/checkout@v5
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
 
     - name: Build Project Variables
       id: project_vars
@@ -59,12 +45,12 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        version=$(python3 ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}/scripts/nuget/generate-alpha-version.py --branch "${{ github.ref }}")
+        version=$(python3 "${{ github.action_path }}/../scripts/nuget/generate-alpha-version.py" --branch "${{ github.ref }}")
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
       shell: bash
-      run: python3 AardexActions/scripts/nuget/update-version.py --new-version ${{ steps.determine_version.outputs.version }}
+      run: python3 "${{ github.action_path }}/../scripts/nuget/update-version.py" --new-version ${{ steps.determine_version.outputs.version }}
 
     - name: Verify and Add RepositoryUrl in .csproj
       shell: bash
@@ -102,7 +88,3 @@ runs:
       shell: bash
       run: dotnet nuget push ${{ steps.build_pack.outputs.PACKAGE_NAME }} --api-key ${{inputs.github-token}} --source "github"
       working-directory: ${{ steps.project_vars.outputs.PROJECT_PATH }}
-
-    - name: Clean AardexActions
-      shell: bash
-      run: rm -rf ${{ steps.setup_vars.outputs.AARDEX_ACTIONS_PATH }}

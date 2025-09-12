@@ -17,7 +17,6 @@ inputs:
   version:
     required: false
     description: "Version tag for the Docker image"
-    default: 'latest'
   config-file-path:
     required: false
     default: ''
@@ -57,15 +56,14 @@ runs:
   using: composite
   steps:
     - name: Build and push Docker image
+      id: publish
       uses: aardex/AardexActions/azure-publish-dotnet-docker@main
       with:
         environment: ${{ inputs.environment }}
-        azure-environment: ${{ inputs.azure-environment }}
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
-        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}
@@ -78,11 +76,11 @@ runs:
       with:
         creds: ${{ inputs.azure-credentials }}
 
-    - name: Update Azure Container Apps
+    - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash
       run: |
         az config set extension.use_dynamic_install=yes_without_prompt
         az containerapp update \
           --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.ca-resource-group }} \
-          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
+          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}

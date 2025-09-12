@@ -1,4 +1,4 @@
-# Azure deploy Docker
+# Azure Publish Docker
 
 This GitHub Action automates the build and deployment of a .NET Azure Function to your specified Azure environment,
 supporting both standard and flex consumption plans.
@@ -18,21 +18,30 @@ supporting both standard and flex consumption plans.
 
 ## 📝 Optional Inputs
 
-| Input              | Description                                          | Default         |
-|--------------------|------------------------------------------------------|-----------------|
-| `config-file-path` | Path to configuration file                           | `''`            |
-| `docker-directory` | Docker directory path                                | `'docker'`      |
-| `platforms`        | Platform available for the image (separated by coma) | `'linux/amd64'` |
-| `skip-check`       | Skip vulnerability check                             | `'false'`       |
+| Input              | Description                                                                                                   | Default         |
+|--------------------|---------------------------------------------------------------------------------------------------------------|-----------------|
+| `config-file-path` | Path to configuration file                                                                                    | `''`            |
+| `docker-directory` | Docker directory path                                                                                         | `'docker'`      |
+| `platforms`        | Platform available for the image (separated by coma)                                                          | `'linux/amd64'` |
+| `skip-check`       | Skip vulnerability check                                                                                      | `'false'`       |
+| `version`          | The version the image to publish and deploy. If not specified, it will used the Directory.Build.props version | `''`            |
+
+## 📤 Outputs
+
+| Output    | Description           |
+|-----------|-----------------------|
+| `version` | The published version |
 
 ## Exemple of variables
+
 ### azure-credentials
+
 ```json
 {
-    "clientSecret": "<managed identity secret>",
-    "subscriptionId": "<managed identity subscription id>",
-    "tenantId": "<managed identity tenant id>",
-    "clientId": "<managed identity client id>"
+  "clientSecret": "<managed identity secret>",
+  "subscriptionId": "<managed identity subscription id>",
+  "tenantId": "<managed identity tenant id>",
+  "clientId": "<managed identity client id>"
 }
 ```
 

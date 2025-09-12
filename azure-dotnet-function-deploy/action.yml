@@ -44,13 +44,6 @@ runs:
       with:
         token: ${{ inputs.github-token }}
 
-    - name: Checkout AardexActions
-      uses: actions/checkout@v5
-      with:
-        ref: main
-        repository: aardex/AardexActions
-        token: ${{ inputs.github-token }}
-        path: AardexActions
 
     - name: Set up Python 3.x
       uses: actions/setup-python@v5
@@ -60,13 +53,13 @@ runs:
     - name: Install python dependencies
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
-      run: pip install -r AardexActions/scripts/requirements.txt
+      run: pip install -r "${{ github.action_path }}/../scripts/requirements.txt"
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: |
-        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+        python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Setup dotnet
       uses: actions/setup-dotnet@v4
