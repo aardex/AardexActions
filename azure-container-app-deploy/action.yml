@@ -56,10 +56,10 @@ runs:
   using: composite
   steps:
     - name: Build and push Docker image
+      id: publish
       uses: aardex/AardexActions/azure-publish-dotnet-docker@features/INFRA-214
       with:
         environment: ${{ inputs.environment }}
-        azure-environment: ${{ inputs.azure-environment }}
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
@@ -76,11 +76,11 @@ runs:
       with:
         creds: ${{ inputs.azure-credentials }}
 
-    - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ inputs.version }}
+    - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash
       run: |
         az config set extension.use_dynamic_install=yes_without_prompt
         az containerapp update \
           --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.ca-resource-group }} \
-          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:1.0.1
+          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}

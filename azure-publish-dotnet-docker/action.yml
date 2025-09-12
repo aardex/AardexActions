@@ -40,6 +40,11 @@ inputs:
     default: 'false'
     description: "Skip vulnerability check"
 
+outputs:
+  version:
+    description: "The version used to build and push the Docker image"
+    value: ${{ steps.resolve_version.outputs.version }}
+
 runs:
   using: composite
   steps:
@@ -59,6 +64,14 @@ runs:
       run: |
         python3 "${{ github.action_path }}/../scripts/nuget/get_version.py" --set-output
 
+    - name: Resolve version
+      id: resolve_version
+      shell: bash
+      run: |
+        resolved="${{ inputs.version != '' && inputs.version || env.VERSION }}"
+        echo "Resolved version: ${resolved}"
+        echo "version=${resolved}" >> "$GITHUB_OUTPUT"
+
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
@@ -69,7 +82,7 @@ runs:
       uses: aardex/AardexActions/azure-publish-docker@features/INFRA-214
       with:
         image-name: ${{ inputs.image-name }}
-        version: ${{ inputs.version != '' && inputs.version || env.VERSION }}
+        version: ${{ steps.resolve_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
