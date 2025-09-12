@@ -65,7 +65,6 @@ runs:
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
-        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}

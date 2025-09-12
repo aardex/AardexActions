@@ -19,9 +19,6 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-  azure-credentials:
-    required: true
-    description: "Azure credentials for authentication"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -77,7 +74,6 @@ runs:
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
         github-token: ${{ inputs.github-token }}
-        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}

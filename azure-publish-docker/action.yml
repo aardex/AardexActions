@@ -12,9 +12,6 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
-  azure-credentials:
-    required: true
-    description: "Azure credentials for authentication"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
