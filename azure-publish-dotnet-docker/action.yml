@@ -79,7 +79,7 @@ runs:
         python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-docker@features/INFRA-214
+      uses: aardex/AardexActions/azure-publish-docker@main
       with:
         image-name: ${{ inputs.image-name }}
         version: ${{ steps.resolve_version.outputs.version }}
