@@ -58,20 +58,19 @@ runs:
 
     - name: Install python dependencies
       shell: bash
-      run: pip install -r AardexActions/scripts/requirements.txt
+      run: pip install -r "${{ github.action_path }}/../scripts/requirements.txt"
 
     - name: Extract version from Directory.Build.props if needed
       if: ${{ inputs.version == '' }}
-      id: extract-version
       shell: bash
       run: |
-        python3 AardexActions/scripts/nuget/get_version.py --set-output
+        python3 "${{ github.action_path }}/../scripts/nuget/get_version.py" --set-output
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: |
-        python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
+        python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
       uses: aardex/AardexActions/azure-publish-docker@features/INFRA-214
