@@ -17,7 +17,6 @@ inputs:
   version:
     required: false
     description: "Version tag for the Docker image"
-    default: 'latest'
   config-file-path:
     required: false
     default: ''
@@ -57,7 +56,7 @@ runs:
   using: composite
   steps:
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-dotnet-docker@main
+      uses: aardex/AardexActions/azure-publish-dotnet-docker@features/INFRA-214
       with:
         environment: ${{ inputs.environment }}
         azure-environment: ${{ inputs.azure-environment }}

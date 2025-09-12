@@ -10,8 +10,7 @@ inputs:
     description: "Name of the Docker image"
   version:
     required: false
-    description: "Version tag for the Docker image"
-    default: 'latest'
+    description: "Version tag for the Docker image. If not provided, will use version from Directory.Build.props"
   config-file-path:
     required: false
     default: ''
@@ -58,9 +57,15 @@ runs:
         python-version: '3.x'
 
     - name: Install python dependencies
-      if: ${{ inputs.config-file-path != '' }}
       shell: bash
       run: pip install -r AardexActions/scripts/requirements.txt
+
+    - name: Extract version from Directory.Build.props if needed
+      if: ${{ inputs.version == '' }}
+      id: extract-version
+      shell: bash
+      run: |
+        python3 AardexActions/scripts/azure/get_version.py --set-output
 
     - name: Setup config
       if: ${{ inputs.config-file-path != '' }}
@@ -69,10 +74,10 @@ runs:
         python3 AardexActions/scripts/azure/update-config.py --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-docker@main
+      uses: aardex/AardexActions/azure-publish-docker@features/INFRA-214
       with:
         image-name: ${{ inputs.image-name }}
-        version: ${{ inputs.version }}
+        version: ${{ inputs.version != '' && inputs.version || env.VERSION }}
         github-token: ${{ inputs.github-token }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
