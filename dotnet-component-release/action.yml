@@ -5,6 +5,10 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
+  version:
+    required: false
+    description: "The version number (manual)"
+    default: ""
 
 runs:
   using: composite
@@ -25,7 +29,8 @@ runs:
       id: determine_version
       shell: bash
       run: |
-        version=$(python3 "${{ github.action_path }}/../scripts/nuget/generate-version.py" release)
+        version="${{ inputs.version }}"
+        [[ -n "${{ inputs.version }}" ]] || version=$(python3 "${{ github.action_path }}/../scripts/nuget/generate-version.py" release)
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
