@@ -5,11 +5,10 @@ It is tailored to fit smoothly into your CI/CD pipeline and supports all standar
 
 ## 🛠️ Inputs
 
-| Input            | Description                                                         | Required | Default |
-|------------------|---------------------------------------------------------------------|----------|---------|
-| `type`           | Type of version to publish <alpha/release-candidate/release/manual> | Yes      | -       |
-| `version`        | Version to publish. Used only when type is manual                   | No       | –       |
-| `github-token`   | GitHub token for authentication                                     | Yes      | –       |
+| Input          | Description                                       | Required | Default |
+| -------------- | ------------------------------------------------- | -------- | ------- |
+| `version`      | Version to publish. Used only when type is manual | No       | –       |
+| `github-token` | GitHub token for authentication                   | Yes      | –       |
 
 ## 📝 Example Usage
 
