@@ -1,0 +1,65 @@
+name: terraform-deploy
+description: Deploy Terraform to Azure
+
+inputs:
+  azure-credentials:
+    required: true
+    description: "Azure credentials for authentication"
+  directory:
+    required: false
+    default: 'terraform'
+    description: Terraform directory to deploy
+  apply:
+    required: false
+    default: 'false'
+    description: "Whether to run terraform apply"
+
+runs:
+  using: composite
+  steps:
+    - name: Extract Azure credentials
+      shell: bash
+      id: creds
+      run: |
+        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.13.3
+
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform init -upgrade -input=false
+
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform validate -no-color
+
+    - name: Terraform Plan
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        terraform plan \
+          -input=false \
+          -no-color \
+          -var-file="terraform.tfvars" \
+          -out=tfplan
+
+    - name: Upload Plan Artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan
+        path: ${{ inputs.directory }}/tfplan
+
+    - name: Terraform Apply (opt-in)
+      if: ${{ inputs.apply == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform apply -input=false -auto-approve tfplan
