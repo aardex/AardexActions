@@ -17,6 +17,9 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Install node
+      uses: actions/setup-node@v5
+
     - name: Login to Azure
       uses: azure/login@v2
       with:
