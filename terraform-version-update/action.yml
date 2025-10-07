@@ -6,13 +6,14 @@ permissions:
 
 inputs:
   type:
-    description: "The type of version increment (major, minor, patch, release-candidate, alpha)"
+    description: "The type of version increment (major, minor, patch, release, release-candidate, alpha)"
     required: true
     type: choice
     options:
       - major
       - minor
       - patch
+      - release
       - release-candidate
       - alpha
 
@@ -34,13 +35,8 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Compute new version
-      id: version_compute
+    - name: Deprecated Action Warning
       shell: bash
       run: |
-        bash ${{ github.action_path }}/action.sh "${{ inputs.type }}" --version "${{ inputs.version }}" --branch "${{ github.ref }}" --file "${{ inputs.version_file }}"
-
-    - name: Update version file
-      shell: bash
-      run: |
-        echo "${{ steps.version_compute.outputs.version }}" > ${{ inputs.version_file }}
+        echo "WARNING: This action is deprecated and will be removed in future releases. Please migrate to the 'github-version-update' action."
+        return 1
