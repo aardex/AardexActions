@@ -39,4 +39,4 @@ runs:
       shell: bash
       run: |
         echo "WARNING: This action is deprecated and will be removed in future releases. Please migrate to the 'github-version-update' action."
-        return 1
+        exit 1
