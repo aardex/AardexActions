@@ -31,6 +31,11 @@ runs:
       with:
         terraform_version: 1.13.3
 
+    - name: Configure Git credential URL
+      shell: bash 
+      run: |
+        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
+
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.directory }}

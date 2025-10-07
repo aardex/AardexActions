@@ -6,12 +6,17 @@ inputs:
     description: Directory to format and validate
     required: true
     default: '.'
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
 
 runs:
   using: composite
   steps:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.13.3
 
     - name: Format Terraform files
       id: format
@@ -24,13 +29,22 @@ runs:
           exit 1
         fi
 
+    - name: Configure Git credential URL
+      shell: bash
+      run: |
+        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
+
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform init -upgrade -input=false
+
     - name: Validate Terraform files
       id: validate
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        terraform init
-        terraform validate
+        terraform validate -no-color
         if [ $? -ne 0 ]; then
           echo "Terraform files are not valid."
           exit 1
