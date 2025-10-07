@@ -30,6 +30,7 @@ runs:
         fi
 
     - name: Configure Git credential URL
+      shell: bash
       run: |
         git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
