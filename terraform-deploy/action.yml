@@ -54,6 +54,14 @@ runs:
         echo "::add-mask::${{ inputs.tfvars-content }}"
         echo "✅ terraform.tfvars created successfully"
 
+    - name: Upload tfvars Artifact
+      if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-tfvars
+        path: ${{ inputs.directory }}/terraform.tfvars
+        if-no-files-found: error
+
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.directory }}
