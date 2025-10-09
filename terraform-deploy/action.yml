@@ -48,8 +48,12 @@ runs:
       working-directory: ${{ inputs.directory }}
       run: |
         echo "📝 Creating terraform.tfvars from input"
-        printf "%s\n" "${{ inputs.tfvars-content }}" > terraform.tfvars
-        echo "✅ terraform.tfvars created successfully"
+        echo "${{ inputs.tfvars-content }}" | sed 's/\\n/\n/g' > terraform.tfvars
+        echo "::add-mask::${{ inputs.tfvars-content }}"
+        echo "✅ terraform.tfvars created successfully (escaped newlines replaced)"
+        echo "----"
+        cat terraform.tfvars
+        echo "----"
 
     - name: Terraform Init
       shell: bash
