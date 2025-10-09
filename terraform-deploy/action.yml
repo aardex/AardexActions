@@ -13,6 +13,12 @@ inputs:
     required: false
     default: 'false'
     description: "Whether to run terraform apply"
+  tfvars-content:
+    required: false
+    description: "Content of the terraform.tfvars file (as a single string, from secrets or workflow input)"
+  github-token:
+    required: true
+    description: "GitHub token for private module access"
 
 runs:
   using: composite
@@ -32,9 +38,20 @@ runs:
         terraform_version: 1.13.3
 
     - name: Configure Git credential URL
-      shell: bash 
+      shell: bash
       run: |
         git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
+
+    # 🆕 Nouvelle étape : créer terraform.tfvars à la volée si fourni
+    - name: Create terraform.tfvars from input
+      if: ${{ inputs.tfvars-content != '' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        echo "Creating terraform.tfvars from input"
+        echo "${{ inputs.tfvars-content }}" > terraform.tfvars
+        echo "Generated terraform.tfvars:"
+        cat terraform.tfvars
 
     - name: Terraform Init
       shell: bash
@@ -50,11 +67,20 @@ runs:
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        terraform plan \
-          -input=false \
-          -no-color \
-          -var-file="terraform.tfvars" \
-          -out=tfplan
+        if [ -f "terraform.tfvars" ]; then
+          echo "✅ terraform.tfvars found, using it."
+          terraform plan \
+            -input=false \
+            -no-color \
+            -var-file="terraform.tfvars" \
+            -out=tfplan
+        else
+          echo "⚠️ No terraform.tfvars found, running plan without it."
+          terraform plan \
+            -input=false \
+            -no-color \
+            -out=tfplan
+        fi
 
     - name: Upload Plan Artifact
       if: always()
