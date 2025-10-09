@@ -47,10 +47,9 @@ runs:
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        echo "Creating terraform.tfvars from input"
-        echo "${{ inputs.tfvars-content }}" > terraform.tfvars
-        echo "Generated terraform.tfvars:"
-        cat terraform.tfvars
+        echo "📝 Creating terraform.tfvars from input"
+        printf "%s\n" "${{ inputs.tfvars-content }}" > terraform.tfvars
+        echo "✅ terraform.tfvars created successfully"
 
     - name: Terraform Init
       shell: bash
