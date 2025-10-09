@@ -43,17 +43,16 @@ runs:
         git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
     - name: Create terraform.tfvars from input
-      if: ${{ inputs.tfvars-content != '' }}
+      if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
         echo "📝 Creating terraform.tfvars from input"
-        echo "${{ inputs.tfvars-content }}" | sed 's/\\n/\n/g' > terraform.tfvars
+        cat <<EOF > terraform.tfvars
+        ${{ inputs.tfvars-content }}
+        EOF
         echo "::add-mask::${{ inputs.tfvars-content }}"
-        echo "✅ terraform.tfvars created successfully (escaped newlines replaced)"
-        echo "----"
-        cat terraform.tfvars
-        echo "----"
+        echo "✅ terraform.tfvars created successfully"
 
     - name: Terraform Init
       shell: bash
