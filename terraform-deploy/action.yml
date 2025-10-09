@@ -42,7 +42,6 @@ runs:
       run: |
         git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
-    # 🆕 Nouvelle étape : créer terraform.tfvars à la volée si fourni
     - name: Create terraform.tfvars from input
       if: ${{ inputs.tfvars-content != '' }}
       shell: bash
