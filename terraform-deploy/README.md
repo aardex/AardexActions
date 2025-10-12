@@ -1,16 +1,32 @@
-# Terraform Deploy
+# Terraform Deploy to Azure
 
-This GitHub action will deploy Azure resources using Terraform.
+This GitHub Action initializes, validates, plans, and optionally applies Terraform configurations against Azure using a service principal. It also supports injecting tfvars content securely and accessing private Terraform modules via a GitHub token.
 
-## 🛠️ Inputs
+## 🔑 Required Inputs
 
-| Input               | Description                                  | Required | Default     |
-|---------------------|----------------------------------------------|----------|-------------|
-| `azure-credentials` | Json with Azure Managed Identity information | true     | N/A         |
-| `directory`         | Terraform directory location from root       | false    | `terraform` |
-| `apply`             | Allow to apply the terraform plan            | false    | `false`     |
+| Input               | Description                                              |
+|---------------------|----------------------------------------------------------|
+| `azure-credentials` | Azure service principal JSON used by Terraform AzureRM  |
+| `github-token`      | Token to access private GitHub modules (read-only)       |
 
-## 📝 Exemple of variables
+## 📝 Optional Inputs
+
+| Input             | Description                                                                                   | Default      |
+|-------------------|-----------------------------------------------------------------------------------------------|--------------|
+| `directory`       | Path to the Terraform working directory                                                       | `terraform`  |
+| `apply`           | Whether to run `terraform apply` on the generated plan (`'true'` or `'false'`)                | `'false'`    |
+| `tfvars-content`  | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input)  | `''`         |
+
+## 📦 What it does
+
+- Exports ARM_ environment variables from `azure-credentials` (clientId, clientSecret, subscriptionId, tenantId).
+- Installs Terraform 1.13.3.
+- Configures Git to use `github-token` for private module sources.
+- Optionally writes `tfvars-content` to `terraform.tfvars` in the working directory.
+- Runs `terraform init -upgrade`, `terraform validate`, and `terraform plan`.
+- Uploads the generated `tfplan` as a workflow artifact.
+- Optionally runs `terraform apply` on `tfplan` when `apply: 'true'`.
+
 ### azure-credentials
 ```json
 {
@@ -21,22 +37,13 @@ This GitHub action will deploy Azure resources using Terraform.
 }
 ```
 
-## 📝 Example Usage
-
-```yaml 
-jobs:
-  terraform:
-    name: Terraform Plan & Apply
-    runs-on:
-      group: Terraform
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Deploy with Terraform
-        uses: aardex/AardexActions/terraform-deploy@main
-        with:
-          azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-          apply: true
+## 🚀 Usage Examples
+### Plan only (no apply):
+```yaml
+  - name: Terraform plan (no apply)
+    uses: your-org/terraform-deploy@v1
+    with:
+      azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
+      github-token: ${{ secrets.PAT_TOKEN }}
+      directory: 'infra/terraform'
 ```
