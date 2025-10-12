@@ -23,22 +23,22 @@ inputs:
 runs:
   using: composite
   steps:
-#    - name: Extract Azure credentials
-#      shell: bash
-#      id: creds
-#      run: |
-#        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
-#        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-#        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
-#        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
+    - name: Extract Azure credentials
+      shell: bash
+      id: creds
+      run: |
+        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
 
-#    - name: Print Azure credentials
-#      shell: bash
-#      run: |
-#        echo "ARM_CLIENT_ID=${{ env.ARM_CLIENT_ID }}"
-#        echo "ARM_CLIENT_SECRET=${{ env.ARM_CLIENT_SECRET }}"
-#        echo "ARM_SUBSCRIPTION_ID=${{ env.ARM_SUBSCRIPTION_ID }}"
-#        echo "ARM_TENANT_ID=${{ env.ARM_TENANT_ID }}"
+    - name: Print Azure credentials
+      shell: bash
+      run: |
+        echo "ARM_CLIENT_ID=${{ env.ARM_CLIENT_ID }}"
+        echo "ARM_CLIENT_SECRET=${{ env.ARM_CLIENT_SECRET }}"
+        echo "ARM_SUBSCRIPTION_ID=${{ env.ARM_SUBSCRIPTION_ID }}"
+        echo "ARM_TENANT_ID=${{ env.ARM_TENANT_ID }}"
 
     - name: Login to Azure
       uses: azure/login@v2
