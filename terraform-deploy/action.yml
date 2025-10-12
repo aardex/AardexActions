@@ -32,6 +32,9 @@ runs:
         echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
         echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
 
+    - name: Login to Azure
+      uses: azure/login@v2
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
