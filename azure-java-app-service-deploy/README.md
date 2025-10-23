@@ -18,8 +18,8 @@ This GitHub Action builds and deploys a Java application to Azure App Service, m
 | Input               | Description                                              | Default   |
 |---------------------|----------------------------------------------------------|-----------|
 | `java-version`      | Path to configuration file                               | `11`      |
-| `gradle-version`    | Gradle version to use                              	 | `8.10`    |
-| `pre-build`         | A pre build step command                              	 | `8.10`    |
+| `gradle-version`    | Gradle version to use                              	     | `8.10`    |
+| `pre-build`         | A pre build step command                              	 | -         |
 | `codecov-token`     | Codecov token (for coverage reports)                     | -         |
 
 ## 🚀 Usage Example
