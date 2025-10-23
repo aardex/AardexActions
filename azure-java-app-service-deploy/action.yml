@@ -1,0 +1,98 @@
+stepname: Deploy Java App Service
+description: Deploy a Java application to Azure App Service
+
+inputs:
+  environment:
+    required: true
+    description: "Target environment for deployment"
+  azure-environment:
+    required: true
+    description: "Azure environment to use"
+  project:
+    required: true
+    description: "Project path to deploy"
+  app-name:
+    required: true
+    description: "Name of the Azure Web App"
+  github-token:
+    required: true
+    description: "GitHub token for authentication"
+  azure-profile:
+    required: true
+    description: "Azure publish profile"
+  codecov-token:
+    required: false
+    description: "Codecov token"
+  java-version:
+    required: false  
+    default: '11'
+    description: "Java version to use"
+  gradle-version:
+    required: false  
+    default: '8.10'
+    description: "Gradle version to use"
+  pre-build:
+    required: false
+    description: "Pre build step command"
+
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        token: ${{ inputs.github-token }}
+
+    - name: Running custom pre build step
+      shell: bash
+      if: ${{ inputs.pre-build }}
+      run: ${{ inputs.pre-build }}
+
+    - name: Setup JDK
+      uses: actions/setup-java@v5
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: 'temurin'
+        server-id: github
+        settings-path: ${{ github.workspace }}
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+      with:
+        gradle-version: ${{ inputs.gradle-version }}
+
+    - name: Create wrapper
+      shell: bash
+      run: gradle wrapper    
+
+    - name: Get Project Version
+      shell: bash
+      run: |
+        VERSION=$(${{github.workspace}}/gradlew -q getVersion)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+      id: version
+      
+    - name: Build with Gradle
+      shell: bash
+      run: ./gradlew build war
+    
+    - name: Test
+      shell: bash
+      run: |
+        ./gradlew test jacocoTestReport
+      working-directory: ${{ inputs.project }}
+
+    - name: Codecov
+      if: ${{ inputs.codecov-token }}
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ inputs.codecov-token }}
+        file: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: 'app-${{ inputs.app-name }}-${{ inputs.azure-environment }}'
+        publish-profile: ${{ inputs.azure-profile }}
+        package: '*.war'
