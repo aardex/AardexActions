@@ -15,12 +15,13 @@ This GitHub Action builds and deploys a Java application to Azure App Service, m
  
 ## 📝 Optional Inputs
 
-| Input               | Description                                              | Default   |
-|---------------------|----------------------------------------------------------|-----------|
-| `java-version`      | Path to configuration file                               | `11`      |
-| `gradle-version`    | Gradle version to use                              	     | `8.10`    |
-| `pre-build`         | A pre build step command                              	 | -         |
-| `codecov-token`     | Codecov token (for coverage reports)                     | -         |
+| Input                | Description                                             | Default   |
+|----------------------|---------------------------------------------------------|-----------|
+| `java-version`       | Path to configuration file                              | `11`      |
+| `gradle-version`     | Gradle version to use                              	    | `8.10`    |
+| `pre-build`          | A pre build step command                              	 | -         |
+| `pre-build-action`   | A pre build step action                                 | -         |
+| `codecov-token`      | Codecov token (for coverage reports)                    | -         |
 
 ## 🚀 Usage Example
 ```yaml
@@ -41,6 +42,7 @@ jobs:
               gradle-version: '8.10' 
               pre-build: |
                 echo "My pre build step"
+              pre-build-action: 'aardex/AardexActions/some-other-action@main'
               codecov-token: ${{ secrets.CODECOV_TOKEN }
 ```
 

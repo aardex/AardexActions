@@ -34,7 +34,9 @@ inputs:
   pre-build:
     required: false
     description: "Pre build step command"
-
+  pre-build-action:
+    required: false
+    description: "Pre build step action"
 
 runs:
   using: composite
@@ -48,6 +50,11 @@ runs:
       shell: bash
       if: ${{ inputs.pre-build }}
       run: ${{ inputs.pre-build }}
+
+    - name: Running custom pre build action step
+      shell: bash
+      if: ${{ inputs.pre-build-action }}
+      uses: ${{ inputs.pre-build-action }}
 
     - name: Setup JDK
       uses: actions/setup-java@v5
