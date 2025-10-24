@@ -47,12 +47,11 @@ runs:
         token: ${{ inputs.github-token }}
 
     - name: Running custom pre build step
-      shell: bash
       if: ${{ inputs.pre-build }}
+      shell: bash
       run: ${{ inputs.pre-build }}
 
     - name: Running custom pre build action step
-      shell: bash
       if: ${{ inputs.pre-build-action }}
       uses: ${{ inputs.pre-build-action }}
 
