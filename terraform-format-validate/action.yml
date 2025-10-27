@@ -2,6 +2,9 @@ name: terraform-forat-validate
 description: Format and validate Terraform module for a given directory
 
 inputs:
+  azure-credentials:
+    required: true
+    description: "Azure credentials in JSON format"
   directory:
     description: Directory to format and validate
     required: true
@@ -13,10 +16,24 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Extract Azure credentials
+      shell: bash
+      id: creds
+      run: |
+        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
+        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
+        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.13.3
+
+    - name: Configure Git credential URL
+      shell: bash
+      run: |
+        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
     - name: Format Terraform files
       id: format
@@ -28,12 +45,7 @@ runs:
           echo "Terraform files are not formatted correctly."
           exit 1
         fi
-
-    - name: Configure Git credential URL
-      shell: bash
-      run: |
-        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
-
+        
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.directory }}
