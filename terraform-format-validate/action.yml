@@ -5,9 +5,6 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials in JSON format"
-  tfvars-content:
-    description: "Content for terraform.tfvars file (as a single string, from secrets or workflow input)"
-    required: false
   directory:
     description: Directory to format and validate
     required: true
@@ -37,18 +34,6 @@ runs:
       shell: bash
       run: |
         git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
-
-    - name: Create terraform.tfvars from input
-      if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
-      shell: bash
-      working-directory: ${{ inputs.directory }}
-      run: |
-        echo "📝 Creating terraform.tfvars from input"
-        cat <<EOF > terraform.tfvars
-        ${{ inputs.tfvars-content }}
-        EOF
-        echo "::add-mask::${{ inputs.tfvars-content }}"
-        echo "✅ terraform.tfvars created successfully"
 
     - name: Format Terraform files
       id: format
