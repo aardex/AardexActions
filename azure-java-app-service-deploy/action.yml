@@ -95,4 +95,4 @@ runs:
       with:
         app-name: 'app-${{ inputs.app-name }}-${{ inputs.azure-environment }}'
         publish-profile: ${{ inputs.azure-profile }}
-        package: '*.war'
+        package: '${{ inputs.project }}/build/libs/*.war'
