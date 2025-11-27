@@ -89,6 +89,7 @@ runs:
       with:
         name: tfplan
         path: ${{ inputs.directory }}/tfplan
+        retention-days: 30
 
     - name: Terraform Apply (opt-in)
       if: ${{ inputs.apply == 'true' }}
