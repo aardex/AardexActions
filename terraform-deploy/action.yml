@@ -103,4 +103,4 @@ runs:
       if: ${{ inputs.apply == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform apply -input=false -auto-approve tfplan
+      run: terraform apply -input=false -auto-approve tfplan.tfplan
