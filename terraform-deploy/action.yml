@@ -74,21 +74,30 @@ runs:
             -input=false \
             -no-color \
             -var-file="terraform.tfvars" \
-            -out=tfplan
+            -out=tfplan.tfplan
         else
           echo "⚠️ No terraform.tfvars found, running plan without it."
           terraform plan \
             -input=false \
             -no-color \
-            -out=tfplan
+            -out=tfplan.tfplan
         fi
+
+    - name: Terraform Show
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform show -json tfplan.tfplan > tfplan.json
 
     - name: Upload Plan Artifact
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: tfplan
-        path: ${{ inputs.directory }}/tfplan
+        path: |
+          ${{ inputs.directory }}/tfplan.tfplan
+          ${{ inputs.directory }}/tfplan.json
+        retention-days: 15
 
     - name: Terraform Apply (opt-in)
       if: ${{ inputs.apply == 'true' }}
