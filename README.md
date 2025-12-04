@@ -34,7 +34,9 @@ This project includes github actions that can be used through our CI/CD chains, 
 - [Commit New Version](./commit-version-changes/README.md): Automatically commit and push version changes to repository
 
 ### Terraform
+- [Terraform Deploy to Azure](./terraform-deploy/README.md): Init, validate, plan, and optionally apply Terraform with optional manual approval
+- [Terraform Destroy for Azure](./terraform-destroy/README.md): Plan a destroy and, with approval, apply it; uploads artifacts for review
 - Generate [Terraform Docs](./terraform-docs/README.md): Generate comprehensive documentation for a given Terraform module
 - Create [Terraform Docs Index](./terraform-docs-index/README.md): Generate an index of documentation for all Terraform modules
 - [Terraform Format and Validate](./terraform-format-validate/README.md): Format and validate Terraform code in a specified folder
-- Search for [Terraform Modules Directories](./terraform-format-validate/README.md): Locate and list all Terraform module directories in a repository
+- Search for [Terraform Modules Directories](./terraform-module-directories/README.md): Locate and list all Terraform module directories in a repository

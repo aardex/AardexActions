@@ -1,5 +1,5 @@
-name: terraform-deploy
-description: Deploy Terraform to Azure
+name: terraform-destroy
+description: Plan and (optionally) apply a Terraform destroy against Azure
 
 inputs:
   azure-credentials:
@@ -8,15 +8,11 @@ inputs:
   directory:
     required: false
     default: 'terraform'
-    description: Terraform directory to deploy
-  apply:
-    required: false
-    default: 'false'
-    description: "Whether to run terraform apply"
+    description: Terraform working directory
   needs-approval:
     required: false
     default: 'true'
-    description: "Whether to require approval for terraform apply"
+    description: "Whether to require manual approval before applying the destroy plan"
   tfvars-content:
     required: false
     description: "Content of the terraform.tfvars file (as a single string, from secrets or workflow input)"
@@ -68,39 +64,41 @@ runs:
       working-directory: ${{ inputs.directory }}
       run: terraform validate -no-color
 
-    - name: Terraform Plan
+    - name: Terraform Plan Destroy
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
         if [ -f "terraform.tfvars" ]; then
           echo "✅ terraform.tfvars found, using it."
           terraform plan \
+            -destroy \
             -input=false \
             -no-color \
             -var-file="terraform.tfvars" \
-            -out=tfplan.tfplan > result.txt 2>&1
+            -out=tfdestroy.tfplan > result.txt 2>&1
         else
-          echo "⚠️ No terraform.tfvars found, running plan without it."
+          echo "⚠️ No terraform.tfvars found, running destroy plan without it."
           terraform plan \
+            -destroy \
             -input=false \
             -no-color \
-            -out=tfplan.tfplan > result.txt 2>&1
+            -out=tfdestroy.tfplan > result.txt 2>&1
         fi
 
-    - name: Terraform Show
+    - name: Terraform Show Destroy Plan
       if: always()
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform show -json tfplan.tfplan > tfplan.json
+      run: terraform show -json tfdestroy.tfplan > tfdestroy.json
 
-    - name: Upload Plan Artifact
+    - name: Upload Destroy Plan Artifact
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: tfplan
+        name: tfdestroy
         path: |
-          ${{ inputs.directory }}/tfplan.tfplan
-          ${{ inputs.directory }}/tfplan.json
+          ${{ inputs.directory }}/tfdestroy.tfplan
+          ${{ inputs.directory }}/tfdestroy.json
           ${{ inputs.directory }}/result.txt
         retention-days: 15
 
@@ -111,11 +109,11 @@ runs:
         secret: ${{ secrets.PAT_TOKEN }}
         approvers: 'Developers'
         minimum-approvals: 1
-        issue-title: 'Approve Deployment of Evrimed to Production'
-        issue-body: 'Please review the changes and approve the deployment to production.'
+        issue-title: 'Approve Terraform Destroy'
+        issue-body: 'Please review and approve the Terraform destroy operation.'
 
-    - name: Terraform Apply (opt-in)
-      if: ${{ inputs.needs-approval == 'true' || inputs.apply == 'true' }}
+    - name: Terraform Apply Destroy (after approval)
+      if: ${{ inputs.needs-approval == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform apply -input=false -auto-approve tfplan.tfplan
+      run: terraform apply -input=false -auto-approve tfdestroy.tfplan
