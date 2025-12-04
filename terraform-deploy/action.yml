@@ -104,18 +104,24 @@ runs:
           ${{ inputs.directory }}/result.txt
         retention-days: 15
 
-    - name: Manual Approval
-      if: ${{ inputs.needs-approval == 'true' }}
-      uses: trstringer/manual-approval@v1.9.0
-      with:
-        secret: ${{ inputs.github-token }}
-        approvers: 'Developers'
-        minimum-approvals: 1
-        issue-title: 'Approve Deployment of terraform to Production'
-        issue-body: 'Please review the changes and approve the deployment to production.'
+#    - name: Manual Approval
+#      if: ${{ inputs.needs-approval == 'true' }}
+#      uses: trstringer/manual-approval@v1.9.0
+#      with:
+#        secret: ${{ inputs.github-token }}
+#        approvers: 'Developers'
+#        minimum-approvals: 1
+#        issue-title: 'Approve Deployment of terraform to Production'
+#        issue-body: 'Please review the changes and approve the deployment to production.'
+#
+#    - name: Terraform Apply (opt-in)
+#      if: ${{ inputs.needs-approval == 'true' || (inputs.apply == 'true' && inputs.needs-approval == 'false')}}
+#      shell: bash
+#      working-directory: ${{ inputs.directory }}
+#      run: terraform apply -input=false -auto-approve tfplan.tfplan
 
     - name: Terraform Apply (opt-in)
-      if: ${{ inputs.needs-approval == 'true' || (inputs.apply == 'true' && inputs.needs-approval == 'false')}}
+      if: ${{ inputs.needs-approval == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: terraform apply -input=false -auto-approve tfplan.tfplan
