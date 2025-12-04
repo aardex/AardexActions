@@ -108,7 +108,7 @@ runs:
       if: ${{ inputs.needs-approval == 'true' }}
       uses: trstringer/manual-approval@v1.9.0
       with:
-        secret: ${{ secrets.PAT_TOKEN }}
+        secret: ${{ inputs.github-token }}
         approvers: 'Developers'
         minimum-approvals: 1
         issue-title: 'Approve Deployment of terraform to Production'
