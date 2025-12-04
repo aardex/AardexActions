@@ -74,13 +74,13 @@ runs:
             -input=false \
             -no-color \
             -var-file="terraform.tfvars" \
-            -out=tfplan.tfplan
+            -out=tfplan.tfplan > result.txt 2>&1
         else
           echo "⚠️ No terraform.tfvars found, running plan without it."
           terraform plan \
             -input=false \
             -no-color \
-            -out=tfplan.tfplan
+            -out=tfplan.tfplan > result.txt 2>&1
         fi
 
     - name: Terraform Show
@@ -97,6 +97,7 @@ runs:
         path: |
           ${{ inputs.directory }}/tfplan.tfplan
           ${{ inputs.directory }}/tfplan.json
+          ${{ inputs.directory }}/result.txt
         retention-days: 15
 
     - name: Terraform Apply (opt-in)
