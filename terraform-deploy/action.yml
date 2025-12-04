@@ -111,11 +111,11 @@ runs:
         secret: ${{ secrets.PAT_TOKEN }}
         approvers: 'Developers'
         minimum-approvals: 1
-        issue-title: 'Approve Deployment of Evrimed to Production'
+        issue-title: 'Approve Deployment of terraform to Production'
         issue-body: 'Please review the changes and approve the deployment to production.'
 
     - name: Terraform Apply (opt-in)
-      if: ${{ inputs.needs-approval == 'true' || inputs.apply == 'true' }}
+      if: ${{ inputs.needs-approval == 'true' || (inputs.apply == 'true' && inputs.needs-approval == 'false')}}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: terraform apply -input=false -auto-approve tfplan.tfplan
