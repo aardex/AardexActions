@@ -121,7 +121,7 @@ runs:
 #      run: terraform apply -input=false -auto-approve tfplan.tfplan
 
     - name: Terraform Apply (opt-in)
-      if: ${{ inputs.needs-approval == 'true' }}
+      if: ${{ inputs.apply == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: terraform apply -input=false -auto-approve tfplan.tfplan
