@@ -36,12 +36,12 @@ runs:
         echo "AARDEX_ACTIONS_BRANCH=main" >> $GITHUB_OUTPUT
 
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         token: ${{ inputs.github-token }}
 
     - name: Checkout AardexActions
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         ref: main
         repository: aardex/AardexActions
@@ -94,7 +94,7 @@ runs:
         fi
 
     - name: Setup dotnet
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ inputs.dotnet-version }}
 
