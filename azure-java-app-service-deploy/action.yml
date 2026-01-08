@@ -40,7 +40,7 @@ runs:
   using: composite
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         token: ${{ inputs.github-token }}
 
@@ -85,10 +85,10 @@ runs:
 
     - name: Codecov
       if: ${{ inputs.codecov-token }}
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ inputs.codecov-token }}
-        file: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
+        files: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v3
