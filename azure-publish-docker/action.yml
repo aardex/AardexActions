@@ -35,10 +35,6 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
-  skip-check:
-    required: false
-    default: 'false'
-    description: "Skip vulnerability check"
 
 runs:
   using: composite
@@ -95,13 +91,3 @@ runs:
       shell: bash
       run: | 
         az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
-
-    - name: Scan Docker image for vulnerabilities
-      if: ${{ inputs.skip-check != 'true' }}
-      uses: aquasecurity/trivy-action@0.28.0
-      with:
-        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version != '' && inputs.version || 'latest' }}
-        format: 'table'
-        exit-code: '1'
-        ignore-unfixed: true
-        severity: 'CRITICAL,HIGH'

@@ -74,7 +74,16 @@ runs:
         acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
-        skip-check: ${{ inputs.skip-check }}
+
+    - name: Scan Docker image for vulnerabilities
+      if: ${{ inputs.skip-check != 'true' }}
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
 
     - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash

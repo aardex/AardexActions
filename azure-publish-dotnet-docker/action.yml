@@ -41,10 +41,6 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
-  skip-check:
-    required: false
-    default: 'false'
-    description: "Skip vulnerability check"
 
 outputs:
   version:
@@ -98,4 +94,3 @@ runs:
         azure-credentials: ${{ inputs.azure-credentials }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
-        skip-check: ${{ inputs.skip-check }}
