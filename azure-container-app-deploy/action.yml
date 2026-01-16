@@ -60,7 +60,7 @@ runs:
   steps:
     - name: Build and push Docker image
       id: publish
-      uses: aardex/AardexActions/azure-publish-dotnet-docker@features/MMA-1719
+      uses: aardex/AardexActions/azure-publish-dotnet-docker@main
       with:
         environment: ${{ inputs.environment }}
         image-name: ${{ inputs.image-name }}
