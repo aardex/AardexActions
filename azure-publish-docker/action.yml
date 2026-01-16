@@ -52,6 +52,11 @@ runs:
         az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
         az account set --subscription ${{ inputs.subscription-id }}
 
+    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
+      shell: bash
+      run: | 
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true      
+
     - name: Login to Azure Container Registry ${{ inputs.acr-login-server }}
       uses: azure/docker-login@v2
       with:
@@ -84,6 +89,12 @@ runs:
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
         provenance: false
+
+    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
+      if: always()
+      shell: bash
+      run: | 
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
 
     - name: Scan Docker image for vulnerabilities
       if: ${{ inputs.skip-check != 'true' }}
