@@ -22,11 +22,11 @@ inputs:
     required: true
     description: "Azure Container Server Name"
   acr-username:
-    required: false
-    description: "Azure Container Registry Username (optional if using azure-credentials)"
+    required: true
+    description: "Azure Container Registry Username"
   acr-password:
-    required: false
-    description: "Azure Container Registry Password (optional if using azure-credentials)"
+    required: true
+    description: "Azure Container Registry Password"
   docker-directory:
     required: false
     default: 'docker'

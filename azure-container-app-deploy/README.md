@@ -16,7 +16,7 @@ supporting both standard and flex consumption plans.
 | `subscription-id`  | Azure Subscription ID                                    |
 | `acr-login-server`  | Server name of Azure registry (Settings > Access keys)   |
 | `acr-username`      | Username of Azure registry (Settings > Access keys)      |
-| `acr-passworrd`     | Password name of Azure registry (Settings > Access keys) |
+| `acr-password`      | Password name of Azure registry (Settings > Access keys) |
 | `ca-resource-group` | Registry Resource Group                                  |
 
 ## 📝 Optional Inputs
