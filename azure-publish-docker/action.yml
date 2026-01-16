@@ -46,9 +46,9 @@ runs:
     - name: Login to Azure
       shell: bash
       run: |
-        CLIENT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .clientId)
-        CLIENT_SECRET=$(echo '${{ env.AZ_CRED }}' | jq -r .clientSecret)
-        TENANT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .tenantId)
+        CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)
+        CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)
+        TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)
         az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
         az account set --subscription ${{ inputs.subscription-id }}
 
@@ -77,6 +77,7 @@ runs:
         cache-to: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
+        provenance: false
 
     - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
       if: always()
