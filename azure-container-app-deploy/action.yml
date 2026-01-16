@@ -34,11 +34,11 @@ inputs:
     required: true
     description: "Azure Container Server Name"
   acr-username:
-    required: true
-    description: "Azure Container Registry Username"
+    required: false
+    description: "Azure Container Registry Username (optional if using azure-credentials)"
   acr-password:
-    required: true
-    description: "Azure Container Registry Password"
+    required: false
+    description: "Azure Container Registry Password (optional if using azure-credentials)"
   ca-resource-group:
     required: true
     description: "Resource group for Azure Container App"
