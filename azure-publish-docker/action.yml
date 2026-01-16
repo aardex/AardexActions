@@ -53,9 +53,9 @@ runs:
         az account set --subscription ${{ inputs.subscription-id }}
 
     - name: Login to Azure Container Registry ${{ inputs.acr-login-server }}
-      uses: docker/login-action@v3
+      uses: azure/docker-login@v2
       with:
-        registry: ${{ inputs.acr-login-server }}
+        login-server: ${{ inputs.acr-login-server }}
         username: ${{ inputs.acr-username }}
         password: ${{ inputs.acr-password }}
 
