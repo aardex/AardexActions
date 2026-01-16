@@ -27,6 +27,9 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -55,40 +58,24 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Login to Azure
-      shell: bash
-      run: |
-        CLIENT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .clientId)
-        CLIENT_SECRET=$(echo '${{ env.AZ_CRED }}' | jq -r .clientSecret)
-        TENANT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .tenantId)
-        az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
-
-    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
-      shell: bash
-      run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true
-
     - name: Build and push Docker image
       id: publish
-      uses: aardex/AardexActions/azure-publish-dotnet-docker@main
+      # TODO QTU
+      uses: aardex/AardexActions/azure-publish-docker@features/MMA-1719
       with:
         environment: ${{ inputs.environment }}
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
+        subscription-id: ${{ inputs.subscription-id }}
+        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
         skip-check: ${{ inputs.skip-check }}
-
-    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
-      if: always()
-      shell: bash
-      run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
 
     - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash

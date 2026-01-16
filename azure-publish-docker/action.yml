@@ -12,6 +12,12 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
+  azure-credentials:
+    required: false
+    description: "Azure credentials for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -44,6 +50,7 @@ runs:
         CLIENT_SECRET=$(echo '${{ env.AZ_CRED }}' | jq -r .clientSecret)
         TENANT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .tenantId)
         az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
+        az account set --subscription ${{ inputs.subscription-id }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3

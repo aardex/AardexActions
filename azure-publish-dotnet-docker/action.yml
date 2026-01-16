@@ -18,6 +18,9 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -27,6 +30,9 @@ inputs:
   acr-password:
     required: true
     description: "Azure Container Registry Password"
+  azure-credentials:
+    required: false
+    description: "Azure credentials for authentication"
   docker-directory:
     required: false
     default: 'docker'
@@ -79,14 +85,17 @@ runs:
         python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
-      uses: aardex/AardexActions/azure-publish-docker@main
+      # TODO QTU
+      uses: aardex/AardexActions/azure-publish-docker@features/MMA-1719
       with:
         image-name: ${{ inputs.image-name }}
         version: ${{ steps.resolve_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
+        subscription-id: ${{ inputs.subscription-id }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}
+        azure-credentials: ${{ inputs.azure-credentials }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
         skip-check: ${{ inputs.skip-check }}
