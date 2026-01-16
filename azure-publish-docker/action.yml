@@ -49,6 +49,8 @@ runs:
     - name: Set up Docker Buildx
       id: buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
 
     - name: Login to Azure
       shell: bash
@@ -73,6 +75,7 @@ runs:
         file: ${{ inputs.docker-directory }}/Dockerfile
         push: true
         platforms: ${{ inputs.platforms }}
+        builder: ${{ steps.buildx.outputs.name }}
         tags: |
           ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version != '' && inputs.version || 'latest' }}
           ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:latest
