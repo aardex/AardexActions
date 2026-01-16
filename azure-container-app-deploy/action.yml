@@ -55,6 +55,19 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Login to Azure
+      shell: bash
+      run: |
+        CLIENT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .clientId)
+        CLIENT_SECRET=$(echo '${{ env.AZ_CRED }}' | jq -r .clientSecret)
+        TENANT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .tenantId)
+        az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
+
+    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
+      shell: bash
+      run: | 
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true
+
     - name: Build and push Docker image
       id: publish
       uses: aardex/AardexActions/azure-publish-dotnet-docker@main
@@ -71,18 +84,11 @@ runs:
         platforms: ${{ inputs.platforms }}
         skip-check: ${{ inputs.skip-check }}
 
-    - name: Login to Azure
-      shell: bash
-      run: |
-        CLIENT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .clientId)
-        CLIENT_SECRET=$(echo '${{ env.AZ_CRED }}' | jq -r .clientSecret)
-        TENANT_ID=$(echo '${{ env.AZ_CRED }}' | jq -r .tenantId)
-        az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
-
-    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
+    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
+      if: always()
       shell: bash
       run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
 
     - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash
@@ -92,9 +98,3 @@ runs:
           --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.ca-resource-group }} \
           --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
-
-    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
-      if: always()
-      shell: bash
-      run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
