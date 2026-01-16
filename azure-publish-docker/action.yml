@@ -43,12 +43,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
     - name: Login to Azure
       shell: bash
       run: |
@@ -58,12 +52,18 @@ runs:
         az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
         az account set --subscription ${{ inputs.subscription-id }}
 
-    - name: Login to Azure Container Registry
+    - name: Login to Azure Container Registry ${{ inputs.acr-login-server }}
       uses: azure/docker-login@v2
       with:
         login-server: ${{ inputs.acr-login-server }}
         username: ${{ inputs.acr-username }}
         password: ${{ inputs.acr-password }}
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
     - name: Build and push Docker image ${{ inputs.image-name }}:${{ inputs.version }}
       uses: docker/build-push-action@v5
