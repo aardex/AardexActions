@@ -18,6 +18,9 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -27,6 +30,9 @@ inputs:
   acr-password:
     required: true
     description: "Azure Container Registry Password"
+  azure-credentials:
+    required: false
+    description: "Azure credentials for authentication"
   docker-directory:
     required: false
     default: 'docker'
@@ -35,10 +41,6 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
-  skip-check:
-    required: false
-    default: 'false'
-    description: "Skip vulnerability check"
 
 outputs:
   version:
@@ -84,9 +86,10 @@ runs:
         image-name: ${{ inputs.image-name }}
         version: ${{ steps.resolve_version.outputs.version }}
         github-token: ${{ inputs.github-token }}
+        subscription-id: ${{ inputs.subscription-id }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}
+        azure-credentials: ${{ inputs.azure-credentials }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
-        skip-check: ${{ inputs.skip-check }}

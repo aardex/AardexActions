@@ -12,6 +12,12 @@ inputs:
   github-token:
     required: true
     description: "GitHub token for authentication"
+  azure-credentials:
+    required: false
+    description: "Azure credentials for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -29,15 +35,25 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
-  skip-check:
-    required: false
-    default: 'false'
-    description: "Skip vulnerability check"
 
 runs:
   using: composite
   steps:
-    - name: Login to Azure Container Registry
+    - name: Login to Azure
+      shell: bash
+      run: |
+        CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)
+        CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)
+        TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)
+        az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
+        az account set --subscription ${{ inputs.subscription-id }}
+
+    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
+      shell: bash
+      run: | 
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true      
+
+    - name: Login to Azure Container Registry ${{ inputs.acr-login-server }}
       uses: azure/docker-login@v2
       with:
         login-server: ${{ inputs.acr-login-server }}
@@ -48,7 +64,10 @@ runs:
       uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
+      id: buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
 
     - name: Build and push Docker image ${{ inputs.image-name }}:${{ inputs.version }}
       uses: docker/build-push-action@v5
@@ -57,20 +76,18 @@ runs:
         file: ${{ inputs.docker-directory }}/Dockerfile
         push: true
         platforms: ${{ inputs.platforms }}
+        builder: ${{ steps.buildx.outputs.name }}
         tags: |
-          ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
+          ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version != '' && inputs.version || 'latest' }}
           ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:latest
         cache-from: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache
         cache-to: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
+        provenance: false
 
-    - name: Scan Docker image for vulnerabilities
-      if: ${{ inputs.skip-check != 'true' }}
-      uses: aquasecurity/trivy-action@0.28.0
-      with:
-        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ inputs.version }}
-        format: 'table'
-        exit-code: '1'
-        ignore-unfixed: true
-        severity: 'CRITICAL,HIGH'
+    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
+      if: always()
+      shell: bash
+      run: | 
+        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false

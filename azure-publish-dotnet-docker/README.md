@@ -12,9 +12,10 @@ supporting both standard and flex consumption plans.
 | `image-name`        | Name of the Docker Image                                 |
 | `github-token`      | GitHub token for authentication                          |
 | `azure-credentials` | Json with Azure Managed Identity information             |
+| `subscription-id`  | Azure Subscription ID                                    |
 | `acr-login-server`  | Server name of Azure registry (Settings > Access keys)   |
 | `acr-username`      | Username of Azure registry (Settings > Access keys)      |
-| `acr-passworrd`     | Password name of Azure registry (Settings > Access keys) |
+| `acr-password`      | Password name of Azure registry (Settings > Access keys) |
 
 ## 📝 Optional Inputs
 
@@ -23,7 +24,6 @@ supporting both standard and flex consumption plans.
 | `config-file-path` | Path to configuration file                                                                                    | `''`            |
 | `docker-directory` | Docker directory path                                                                                         | `'docker'`      |
 | `platforms`        | Platform available for the image (separated by coma)                                                          | `'linux/amd64'` |
-| `skip-check`       | Skip vulnerability check                                                                                      | `'false'`       |
 | `version`          | The version the image to publish and deploy. If not specified, it will used the Directory.Build.props version | `''`            |
 
 ## 📤 Outputs
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Docker to Azure Container Apps to ${{ inputs.environment }}
-        uses: aardex/AardexActions/azure-publish-docker@main
+        uses: aardex/AardexActions/azure-publish-dotnet-docker@main
         with:
           environment: ${{ inputs.environment }}
           azure-environment: ${{ vars.AZ_ENV }}
@@ -61,6 +61,7 @@ jobs:
           config-file-path: 'src/MemsMobile.Backend.Functions/appsettings.json'
           github-token: ${{ secrets.PAT_TOKEN }}
           azure-credentials: ${{ secrets.AZ_CREDENTIALS }}
+          subscription-id: ${{ vars.AZ_SUBSCRIPTION_ID }}
           acr-login-server: acradxsandbox.azurecr.io
           acr-username: ${{ secrets.ACR_USERNAME }}
           acr-password: ${{ secrets.ACR_PASSWORD }}

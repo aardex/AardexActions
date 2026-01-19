@@ -9,13 +9,14 @@ supporting both standard and flex consumption plans.
 |---------------------|----------------------------------------------------------|
 | `environment`       | Target environment for deployment                        |
 | `azure-environment` | Azure environment to use                                 |
-| `container-name`    | Name of the Container App                                |
+| `ca-name`           | Name of the Container App                                |
 | `image-name`        | Name of the Docker Image                                 |
 | `github-token`      | GitHub token for authentication                          |
 | `azure-credentials` | Json with Azure Managed Identity information             |
+| `subscription-id`  | Azure Subscription ID                                    |
 | `acr-login-server`  | Server name of Azure registry (Settings > Access keys)   |
 | `acr-username`      | Username of Azure registry (Settings > Access keys)      |
-| `acr-passworrd`     | Password name of Azure registry (Settings > Access keys) |
+| `acr-password`      | Password name of Azure registry (Settings > Access keys) |
 | `ca-resource-group` | Registry Resource Group                                  |
 
 ## 📝 Optional Inputs
@@ -57,6 +58,7 @@ jobs:
           config-file-path: 'src/MemsMobile.Backend.Functions/appsettings.json'
           github-token: ${{ secrets.PAT_TOKEN }}
           azure-credentials: ${{ secrets.AZ_CREDENTIALS }}
+          subscription-id: ${{ vars.AZ_SUBSCRIPTION_ID }}
           acr-login-server: acradxsandbox.azurecr.io
           acr-username: ${{ secrets.ACR_USERNAME }}
           acr-password: ${{ secrets.ACR_PASSWORD }}

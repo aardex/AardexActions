@@ -27,6 +27,9 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
+  subscription-id:
+    required: true
+    description: "Azure Subscription ID"
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
@@ -64,17 +67,23 @@ runs:
         version: ${{ inputs.version }}
         config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
+        subscription-id: ${{ inputs.subscription-id }}
+        azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         acr-username: ${{ inputs.acr-username }}
         acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
-        skip-check: ${{ inputs.skip-check }}
 
-    - name: Login to Azure
-      uses: azure/login@v2
+    - name: Scan Docker image for vulnerabilities
+      if: ${{ inputs.skip-check != 'true' }}
+      uses: aquasecurity/trivy-action@0.28.0
       with:
-        creds: ${{ inputs.azure-credentials }}
+        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
+        format: 'table'
+        exit-code: '1'
+        ignore-unfixed: true
+        severity: 'CRITICAL,HIGH'
 
     - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash
