@@ -10,7 +10,7 @@ inputs:
     description: ""
   dotnet-version:
     required: false
-    default: "8.0.x"
+    default: "10.0.x"
     description: ""
   output-path:
     required: false

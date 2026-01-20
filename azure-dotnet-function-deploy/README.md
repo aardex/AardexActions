@@ -19,7 +19,7 @@ This GitHub Action automates the build and deployment of a .NET Azure Function t
 |-------------------|----------------------------------------------------------|-----------|
 | `config-file-path`| Path to configuration file                               | `''`      |
 | `flex-consumption`| Whether to deploy as a flex consumption plan             | `false`   |
-| `dotnet-version`  | .NET SDK version to use                                  | `8.0.x`   |
+| `dotnet-version`  | .NET SDK version to use                                  | `10.0.x`   |
 | `codecov-token`   | Codecov token (for coverage reports)                     | -         |
 
 ## 🚀 Usage Example
@@ -37,7 +37,7 @@ jobs:
               func-name: 'my-awesome-func' 
               github-token: {{ secrets.PAT_TOKEN }} 
               azure-profile: {{ secrets.AZURE_PUBLISH_PROFILE }} 
-              dotnet-version: '8.0.x' 
+              dotnet-version: '10.0.x' 
               config-file-path: 'src/MyFunctionApp/appsettings.json'
               codecov-token: ${{ secrets.CODECOV_TOKEN }}
 ```

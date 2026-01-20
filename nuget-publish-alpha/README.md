@@ -27,7 +27,7 @@ jobs:
             uses: aardex/create-alpha-version@v1 
             with: 
               project: 'src/MyProject' 
-              dotnet-version: '8.0.x' 
+              dotnet-version: '10.0.x' 
               github-token: ${{ secrets.PAT_TOKEN }}
 ```
 
