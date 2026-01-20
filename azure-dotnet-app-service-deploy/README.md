@@ -18,7 +18,7 @@ This GitHub Action builds and deploys a .NET application to Azure App Service, m
 | Input               | Description                                              | Default   |
 |---------------------|----------------------------------------------------------|-----------|
 | `config-file-path`  | Path to configuration file                               | `''`      |
-| `dotnet-version`    | .NET SDK version to use                                  | `8.0.x`   |
+| `dotnet-version`    | .NET SDK version to use                                  | `10.0.x`   |
 | `codecov-token`     | Codecov token (for coverage reports)                     | -         |
 
 ## 🚀 Usage Example
@@ -36,7 +36,7 @@ jobs:
             app-name: 'my-awesome-app' 
             github-token: {{ secrets.PAT_TOKEN }}
             azure-profile: {{ secrets.AZURE_PUBLISH_PROFILE }}
-            dotnet-version: '8.0.x' 
+            dotnet-version: '10.0.x' 
             config-file-path: 'src/MyFunctionApp/appsettings.json'
             codecov-token: ${{ secrets.CODECOV_TOKEN }
 ```

@@ -30,7 +30,7 @@ jobs:
           uses: aardex/AardexActions/nuget-publish-version@main
           with: 
               project: 'src/MyProject' 
-              dotnet-version: '8.0.x' 
+              dotnet-version: '10.0.x' 
               type: 'manual'
               version: '1.0.0-amazing-feature.1'
               github-token: ${{ secrets.PAT_TOKEN }}

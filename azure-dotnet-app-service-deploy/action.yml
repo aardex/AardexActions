@@ -20,7 +20,7 @@ inputs:
     description: "Path to configuration file"
   dotnet-version:
     required: false
-    default: '8.0.x'
+    default: '10.0.x'
     description: ".NET SDK version to use"
   github-token:
     required: true
