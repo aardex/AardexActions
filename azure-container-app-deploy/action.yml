@@ -33,12 +33,6 @@ inputs:
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
-  acr-username:
-    required: true
-    description: "Azure Container Registry Username"
-  acr-password:
-    required: true
-    description: "Azure Container Registry Password"
   ca-resource-group:
     required: true
     description: "Resource group for Azure Container App"
@@ -70,8 +64,6 @@ runs:
         subscription-id: ${{ inputs.subscription-id }}
         azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
-        acr-username: ${{ inputs.acr-username }}
-        acr-password: ${{ inputs.acr-password }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
 

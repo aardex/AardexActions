@@ -24,12 +24,6 @@ inputs:
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
-  acr-username:
-    required: true
-    description: "Azure Container Registry Username"
-  acr-password:
-    required: true
-    description: "Azure Container Registry Password"
   azure-credentials:
     required: false
     description: "Azure credentials for authentication"
@@ -88,8 +82,6 @@ runs:
         github-token: ${{ inputs.github-token }}
         subscription-id: ${{ inputs.subscription-id }}
         acr-login-server: ${{ inputs.acr-login-server }}
-        acr-username: ${{ inputs.acr-username }}
-        acr-password: ${{ inputs.acr-password }}
         azure-credentials: ${{ inputs.azure-credentials }}
         docker-directory: ${{ inputs.docker-directory }}
         platforms: ${{ inputs.platforms }}
