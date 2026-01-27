@@ -21,12 +21,6 @@ inputs:
   acr-login-server:
     required: true
     description: "Azure Container Server Name"
-  acr-username:
-    required: true
-    description: "Azure Container Registry Username"
-  acr-password:
-    required: true
-    description: "Azure Container Registry Password"
   docker-directory:
     required: false
     default: 'docker'
@@ -48,17 +42,10 @@ runs:
         az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
         az account set --subscription ${{ inputs.subscription-id }}
 
-    - name: Activate admin user to ACR ${{ inputs.acr-login-server }}
-      shell: bash
-      run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled true      
-
     - name: Login to Azure Container Registry ${{ inputs.acr-login-server }}
-      uses: azure/docker-login@v2
-      with:
-        login-server: ${{ inputs.acr-login-server }}
-        username: ${{ inputs.acr-username }}
-        password: ${{ inputs.acr-password }}
+      shell: bash
+      run: |
+        az acr login --name ${{ inputs.acr-login-server }}
 
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
@@ -85,9 +72,3 @@ runs:
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
         provenance: false
-
-    - name: Deactivate admin user to ACR ${{ inputs.acr-login-server }}
-      if: always()
-      shell: bash
-      run: | 
-        az acr update -n ${{ inputs.acr-login-server }} --admin-enabled false
