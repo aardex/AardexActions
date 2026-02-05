@@ -25,6 +25,10 @@ inputs:
     required: false
     default: 'docker'
     description: "Path to the Dockerfile"
+  dockerfile-name:
+    required: false
+    default: 'Dockerfile'
+    description: "Name of the Dockerfile"
   platforms:
     required: false
     default: 'linux/amd64'
@@ -60,7 +64,7 @@ runs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ${{ inputs.docker-directory }}/Dockerfile
+        file: ${{ inputs.docker-directory }}/${{ inputs.dockerfile-name }}
         push: true
         platforms: ${{ inputs.platforms }}
         builder: ${{ steps.buildx.outputs.name }}
