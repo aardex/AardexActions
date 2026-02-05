@@ -40,6 +40,10 @@ inputs:
     required: false
     default: 'docker'
     description: "Path to the Dockerfile"
+  dockerfile-name:
+    required: false
+    default: 'Dockerfile'
+    description: "Name of the Dockerfile"
   platforms:
     required: false
     default: 'linux/amd64'
@@ -65,6 +69,7 @@ runs:
         azure-credentials: ${{ inputs.azure-credentials }}
         acr-login-server: ${{ inputs.acr-login-server }}
         docker-directory: ${{ inputs.docker-directory }}
+        dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}
 
     - name: Scan Docker image for vulnerabilities

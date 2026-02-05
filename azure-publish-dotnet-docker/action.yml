@@ -31,6 +31,10 @@ inputs:
     required: false
     default: 'docker'
     description: "Path to the Dockerfile"
+  dockerfile-name:
+    required: false
+    default: 'Dockerfile'
+    description: "Name of the Dockerfile"
   platforms:
     required: false
     default: 'linux/amd64'
@@ -84,4 +88,5 @@ runs:
         acr-login-server: ${{ inputs.acr-login-server }}
         azure-credentials: ${{ inputs.azure-credentials }}
         docker-directory: ${{ inputs.docker-directory }}
+        dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}

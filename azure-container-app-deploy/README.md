@@ -23,6 +23,7 @@ supporting both standard and flex consumption plans.
 |--------------------|---------------------------------------------------------------------------------------------------------------|-----------------|
 | `config-file-path` | Path to configuration file                                                                                    | `''`            |
 | `docker-directory` | Docker directory path                                                                                         | `'docker'`      |
+| `dockerfile-name`  |  Dockerfile name                                                                                              | `'Dockerfile'`      |
 | `platforms`        | Platform available for the image (separated by coma)                                                          | `'linux/amd64'` |
 | `skip-check`       | Skip vulnerability check                                                                                      | `'false'`       |
 | `version`          | The version the image to publish and deploy. If not specified, it will used the Directory.Build.props version | `''`            |
