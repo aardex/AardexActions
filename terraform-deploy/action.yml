@@ -5,6 +5,9 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
+  azure-subscription:
+    required: false
+    description: "Azure subscription to deploy to (defaults to first subscription in credentials)"
   directory:
     required: false
     default: 'terraform'
@@ -33,7 +36,13 @@ runs:
       run: |
         echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
         echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        
+        if [ -n "${{ inputs.azure-subscription }}" ]; then
+          echo "ARM_SUBSCRIPTION_ID=${{ inputs.azure-subscription }}" >> $GITHUB_ENV
+        else
+          echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        fi
+        
         echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
 
     - name: Setup Terraform

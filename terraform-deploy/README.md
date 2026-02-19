@@ -11,16 +11,18 @@ This GitHub Action initializes, validates, plans, and optionally applies Terrafo
 
 ## 📝 Optional Inputs
 
-| Input             | Description                                                                                   | Default      |
-|-------------------|-----------------------------------------------------------------------------------------------|--------------|
-| `directory`       | Path to the Terraform working directory                                                       | `terraform`  |
-| `apply`           | Whether to run `terraform apply` on the generated plan (`'true'` or `'false'`)                | `'false'`    |
-| `needs-approval`  | When `'true'`, pauses for manual approval before applying; when `'false'`, no approval gate   | `'true'`     |
-| `tfvars-content`  | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input)  | `''`         |
+| Input                | Description                                                                                   | Default      |
+|----------------------|-----------------------------------------------------------------------------------------------|--------------|
+| `azure-subscription` | Azure subscription to deploy to (defaults to first subscription in credentials)               | `''`         |
+| `directory`          | Path to the Terraform working directory                                                       | `terraform`  |
+| `apply`              | Whether to run `terraform apply` on the generated plan (`'true'` or `'false'`)                | `'false'`    |
+| `needs-approval`     | When `'true'`, pauses for manual approval before applying; when `'false'`, no approval gate   | `'true'`     |
+| `tfvars-content`     | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input)  | `''`         |
 
 ## 📦 What it does
 
 - Exports ARM_ environment variables from `azure-credentials` (clientId, clientSecret, subscriptionId, tenantId).
+- If `azure-subscription` is provided, it overrides the `subscriptionId` from `azure-credentials`.
 - Installs Terraform 1.13.3.
 - Configures Git to use `github-token` for private module sources.
 - Optionally writes `tfvars-content` to `terraform.tfvars` in the working directory.
