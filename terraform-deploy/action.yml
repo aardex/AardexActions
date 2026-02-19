@@ -30,20 +30,19 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Extract Azure credentials
+    - name: Login to Azure
       shell: bash
-      id: creds
       run: |
-        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        
+        CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)
+        CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)
         if [ -n "${{ inputs.azure-subscription }}" ]; then
-          echo "ARM_SUBSCRIPTION_ID=${{ inputs.azure-subscription }}" >> $GITHUB_ENV
+          SUBSCRIPTION_ID=${{ inputs.azure-subscription }}
         else
-          echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+          SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)
         fi
-        
-        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
+        TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)
+        az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
+        az account set --subscription "$SUBSCRIPTION_ID"
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -112,22 +111,6 @@ runs:
           ${{ inputs.directory }}/tfplan.json
           ${{ inputs.directory }}/result.txt
         retention-days: 15
-
-#    - name: Manual Approval
-#      if: ${{ inputs.needs-approval == 'true' }}
-#      uses: trstringer/manual-approval@v1.9.0
-#      with:
-#        secret: ${{ inputs.github-token }}
-#        approvers: 'Developers'
-#        minimum-approvals: 1
-#        issue-title: 'Approve Deployment of terraform to Production'
-#        issue-body: 'Please review the changes and approve the deployment to production.'
-#
-#    - name: Terraform Apply (opt-in)
-#      if: ${{ inputs.needs-approval == 'true' || (inputs.apply == 'true' && inputs.needs-approval == 'false')}}
-#      shell: bash
-#      working-directory: ${{ inputs.directory }}
-#      run: terraform apply -input=false -auto-approve tfplan.tfplan
 
     - name: Terraform Apply (opt-in)
       if: ${{ inputs.apply == 'true' }}
