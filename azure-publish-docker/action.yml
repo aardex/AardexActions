@@ -33,6 +33,10 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  extra-build-args:
+    required: false
+    default: ''
+    description: "Additional Docker build args (multi-line KEY=VALUE)"
 
 runs:
   using: composite
@@ -75,4 +79,5 @@ runs:
         cache-to: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
           NUGET_PAT=${{ inputs.github-token }}
+          ${{ inputs.extra-build-args }}
         provenance: false
