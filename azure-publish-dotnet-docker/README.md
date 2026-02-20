@@ -17,13 +17,14 @@ supporting both standard and flex consumption plans.
 
 ## 📝 Optional Inputs
 
-| Input              | Description                                                                                                   | Default         |
-|--------------------|---------------------------------------------------------------------------------------------------------------|-----------------|
-| `config-file-path` | Path to configuration file                                                                                    | `''`            |
-| `docker-directory` | Docker directory path                                                                                         | `'docker'`      |
-| `dockerfile-name`  |  Dockerfile name                                                                                              | `'Dockerfile'`      |
-| `platforms`        | Platform available for the image (separated by coma)                                                          | `'linux/amd64'` |
-| `version`          | The version the image to publish and deploy. If not specified, it will used the Directory.Build.props version | `''`            |
+| Input              | Description                                                                                                   | Default           |
+|--------------------|---------------------------------------------------------------------------------------------------------------|-------------------|
+| `config-file-path` | Path to configuration file                                                                                    | `''`              |
+| `docker-directory` | Docker directory path                                                                                         | `'docker'`        |
+| `dockerfile-name`  | Dockerfile name                                                                                               | `'Dockerfile'`    |
+| `platforms`        | Platform available for the image (separated by coma)                                                          | `'linux/amd64'`   |
+| `version`          | The version the image to publish and deploy. If not specified, it will used the Directory.Build.props version | `''`              |
+| `build-args`       | Additional Docker build args (multi-line KEY=VALUE)                                                           | `''`              |
 
 ## 📤 Outputs
 
@@ -65,4 +66,7 @@ jobs:
           dockerfile-path: 'docker'
           docker-directory: 'docker'
           platforms: 'linux/amd64,linux/arm64'
+          build-args: |
+            VENDOR_LIB_VERSION=1.2.3
+            FEATURE_FLAG=true
 ```

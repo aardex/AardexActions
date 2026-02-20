@@ -39,6 +39,10 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  build-args:
+    required: false
+    default: ''
+    description: "Docker build args (multi-line KEY=VALUE)"
 
 outputs:
   version:
@@ -90,3 +94,4 @@ runs:
         docker-directory: ${{ inputs.docker-directory }}
         dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}
+        build-args: ${{ inputs.build-args }}
