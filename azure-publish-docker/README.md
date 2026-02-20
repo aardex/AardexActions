@@ -23,6 +23,7 @@ supporting both standard and flex consumption plans.
 | `dockerfile-name`  | Dockerfile name                                      | `'Dockerfile'`      |
 | `platforms`        | Platform available for the image (separated by coma) | `'linux/amd64'` |
 | `version`          | The version the image to publish.                    | `'latest'`      |
+| `build-args`       | Additional Docker build args (multi-line KEY=VALUE)  | `''`            |
 
 ## Exemple of variables
 ### azure-credentials
@@ -56,4 +57,7 @@ jobs:
           dockerfile-path: 'docker'
           docker-directory: 'docker'
           platforms: 'linux/amd64,linux/arm64'
+          build-args: |
+            VENDOR_LIB_VERSION=1.2.3
+            FEATURE_FLAG=true
 ```
