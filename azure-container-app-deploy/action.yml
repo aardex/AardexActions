@@ -48,6 +48,10 @@ inputs:
     required: false
     default: 'linux/amd64'
     description: "Comma-separated list of target platforms for multi-arch build"
+  build-args:
+    required: false
+    default: ''
+    description: "Docker build args (multi-line KEY=VALUE)"
   skip-check:
     required: false
     default: 'false'
@@ -71,6 +75,7 @@ runs:
         docker-directory: ${{ inputs.docker-directory }}
         dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}
+        build-args: ${{ inputs.build-args }}
 
     - name: Scan Docker image for vulnerabilities
       if: ${{ inputs.skip-check != 'true' }}
