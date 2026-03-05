@@ -23,6 +23,10 @@ inputs:
   tfvars-content:
     required: false
     description: "Content of the terraform.tfvars file (as a single string, from secrets or workflow input)"
+  plan-args:
+    required: false
+    default: ''
+    description: "Additional arguments to pass to terraform plan (e.g., '-refresh=true -replace=xxx')"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -82,20 +86,24 @@ runs:
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
+        PLAN_ARGS="${{ inputs.plan-args }}"
+
         if [ -f "terraform.tfvars" ]; then
           echo "✅ terraform.tfvars found, using it."
-          terraform plan \
-            -input=false \
-            -no-color \
-            -var-file="terraform.tfvars" \
-            -out=tfplan.tfplan > result.txt 2>&1
+          CMD=(terraform plan -input=false -no-color -var-file="terraform.tfvars")
         else
           echo "⚠️ No terraform.tfvars found, running plan without it."
-          terraform plan \
-            -input=false \
-            -no-color \
-            -out=tfplan.tfplan > result.txt 2>&1
+          CMD=(terraform plan -input=false -no-color)
         fi
+
+        if [ -n "$PLAN_ARGS" ]; then
+          echo "ℹ️ Adding custom plan arguments: $PLAN_ARGS"
+          CMD+=($PLAN_ARGS)
+        fi
+
+        CMD+=(-out=tfplan.tfplan)
+
+        "${CMD[@]}" > result.txt 2>&1
 
     - name: Terraform Show
       if: always()
