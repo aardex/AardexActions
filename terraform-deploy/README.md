@@ -18,6 +18,7 @@ This GitHub Action initializes, validates, plans, and optionally applies Terrafo
 | `apply`              | Whether to run `terraform apply` on the generated plan (`'true'` or `'false'`)                | `'false'`    |
 | `needs-approval`     | When `'true'`, pauses for manual approval before applying; when `'false'`, no approval gate   | `'true'`     |
 | `tfvars-content`     | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input)  | `''`         |
+| `plan-args`          | Additional arguments passed to `terraform plan` (e.g., `-refresh=true -replace=module.project.random_id.template_suffix`) | `''`         |
 
 ## 📦 What it does
 
@@ -27,6 +28,7 @@ This GitHub Action initializes, validates, plans, and optionally applies Terrafo
 - Configures Git to use `github-token` for private module sources.
 - Optionally writes `tfvars-content` to `terraform.tfvars` in the working directory.
 - Runs `terraform init -upgrade`, `terraform validate`, and `terraform plan`.
+- Supports passing additional plan flags through `plan-args` (e.g., `-refresh=true` or `-replace=...`).
 - Uploads the generated `tfplan` as a workflow artifact.
 - Apply behavior:
   - If `needs-approval: 'true'` (default) and `apply: 'true'`, the job will require manual approval before running `terraform apply`.
@@ -54,6 +56,7 @@ This GitHub Action initializes, validates, plans, and optionally applies Terrafo
       github-token: ${{ secrets.PAT_TOKEN }}
       directory: 'infra/terraform'
       apply: 'false'  # default
+      plan-args: "-refresh=true -replace=module.project.random_id.template_suffix"
 ```
 
 ### Apply with manual approval (recommended)
