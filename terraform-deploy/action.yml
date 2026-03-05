@@ -58,12 +58,14 @@ runs:
       if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
+      env:
+        TFVARS_CONTENT: ${{ inputs.tfvars-content }}
       run: |
         echo "📝 Creating terraform.tfvars from input"
-        cat <<EOF > terraform.tfvars
-        ${{ inputs.tfvars-content }}
-        EOF
-        echo "::add-mask::${{ inputs.tfvars-content }}"
+        while IFS= read -r line; do
+          echo "::add-mask::$line"
+        done <<< "$TFVARS_CONTENT"
+        printf '%s\n' "$TFVARS_CONTENT" > terraform.tfvars
         echo "✅ terraform.tfvars created successfully"
 
     - name: Terraform Init
