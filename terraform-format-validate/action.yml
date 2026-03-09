@@ -9,6 +9,18 @@ inputs:
     description: Directory to format and validate
     required: true
     default: '.'
+  fix:
+    description: Automatically fix Terraform formatting issues
+    required: false
+    default: 'true'
+  auto-commit:
+    description: Automatically commit and push formatting fixes (true, false, or auto to follow fix)
+    required: false
+    default: 'auto'
+  auto-commit-message:
+    description: Commit message used when auto-commit is enabled
+    required: false
+    default: 'chore(terraform): auto-format files [skip ci]'
   github-token:
     required: true
     description: "GitHub token for authentication"
@@ -40,10 +52,10 @@ runs:
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        terraform fmt -check -recursive
-        if [ $? -ne 0 ]; then
-          echo "Terraform files are not formatted correctly."
-          exit 1
+        if [ "${{ inputs.fix }}" = "true" ]; then
+          terraform fmt -recursive
+        else
+          terraform fmt -check -recursive
         fi
         
     - name: Terraform Init
@@ -61,3 +73,32 @@ runs:
           echo "Terraform files are not valid."
           exit 1
         fi
+
+    - name: Commit and push formatting fixes
+      if: ${{ (inputs.auto-commit == 'true') || (inputs.auto-commit == 'auto' && inputs.fix == 'true') }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "No changes to commit."
+          exit 0
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add -A
+        if git diff --cached --quiet; then
+          echo "No staged changes to commit."
+          exit 0
+        fi
+
+        git commit -m "${{ inputs.auto-commit-message }}"
+
+        BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}}"
+        if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
+          echo "Could not determine a valid branch name for push."
+          exit 1
+        fi
+
+        git push origin "HEAD:${BRANCH}"
