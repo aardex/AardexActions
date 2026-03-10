@@ -32,6 +32,7 @@ This project includes github actions that can be used through our CI/CD chains, 
 
 ### GitHub
 - [Commit New Version](./commit-version-changes/README.md): Automatically commit and push version changes to repository
+- [Copilot PR Review](./copilot-pr-review/README.md): Post a @copilot review-summary request as a comment on a pull request
 
 ### Terraform
 - [Terraform Deploy to Azure](./terraform-deploy/README.md): Init, validate, plan, and optionally apply Terraform with optional manual approval

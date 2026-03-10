@@ -1,0 +1,77 @@
+name: copilot-pr-review
+description: Post a @copilot review-summary request as a comment on a pull request
+
+inputs:
+  github-token:
+    description: "GitHub token with pull-requests: write permission"
+    required: true
+
+  prompt:
+    description: "The message to post as a PR comment (must mention @copilot)"
+    required: false
+    default: |
+      @copilot
+      Summarize the changes introduced by this pull request for reviewers.
+      Include:
+      - purpose
+      - main code changes
+      - risks
+      - what reviewers should focus on
+      Keep it concise.
+
+  avoid-duplicates:
+    description: "Skip posting if a comment with the marker already exists (true/false)"
+    required: false
+    default: 'true'
+
+  marker:
+    description: "Hidden HTML marker embedded in the comment to detect duplicates"
+    required: false
+    default: '<!-- copilot-pr-review-action -->'
+
+runs:
+  using: composite
+  steps:
+    - name: Post Copilot review request
+      uses: actions/github-script@v7
+      env:
+        INPUT_PROMPT: ${{ inputs.prompt }}
+        INPUT_MARKER: ${{ inputs.marker }}
+        INPUT_AVOID_DUPLICATES: ${{ inputs.avoid-duplicates }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const marker     = process.env.INPUT_MARKER;
+          const prompt     = process.env.INPUT_PROMPT;
+          const avoidDups  = process.env.INPUT_AVOID_DUPLICATES === 'true';
+          const prNumber   = context.payload.pull_request?.number;
+
+          if (!prNumber) {
+            core.setFailed('This action must run in the context of a pull_request event.');
+            return;
+          }
+
+          if (avoidDups) {
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const alreadyPosted = comments.some(c => c.body?.includes(marker));
+            if (alreadyPosted) {
+              core.info('Copilot review comment already exists — skipping.');
+              return;
+            }
+          }
+
+          const body = `${marker}\n${prompt}`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo:  context.repo.repo,
+            issue_number: prNumber,
+            body,
+          });
+
+          core.info('Copilot review request posted successfully.');
