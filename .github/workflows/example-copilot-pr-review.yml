@@ -2,7 +2,7 @@ name: Request Copilot PR Review Summary
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 permissions:
   pull-requests: write
