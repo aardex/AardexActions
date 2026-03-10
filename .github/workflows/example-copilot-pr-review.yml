@@ -1,0 +1,18 @@
+name: Request Copilot PR Review Summary
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  copilot-review:
+    name: Post Copilot review request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request Copilot review summary
+        uses: aardex/AardexActions/copilot-pr-review@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
