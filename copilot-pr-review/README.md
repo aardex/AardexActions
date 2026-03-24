@@ -2,10 +2,6 @@
 
 Generates a pull request summary with GitHub Copilot CLI, then posts the result as a normal PR comment.
 
-## Important
-
-This action does not try to trigger Copilot by posting `@copilot` in a PR comment. Instead, it runs GitHub Copilot CLI directly inside the workflow, which is the supported automation path documented by GitHub.
-
 ## Inputs
 
 | Input | Required | Default | Description |
