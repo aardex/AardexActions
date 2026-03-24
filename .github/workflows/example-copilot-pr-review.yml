@@ -5,14 +5,16 @@ on:
     types: [opened]
 
 permissions:
+  contents: read
   pull-requests: write
 
 jobs:
   copilot-review:
-    name: Post Copilot review request
+    name: Generate and post Copilot PR summary
     runs-on: ubuntu-latest
     steps:
       - name: Request Copilot review summary
         uses: aardex/AardexActions/copilot-pr-review@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          copilot-token: ${{ secrets.COPILOT_PAT }}
