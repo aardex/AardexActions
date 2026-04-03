@@ -9,6 +9,7 @@ It is tailored to fit smoothly into your CI/CD pipeline and supports all standar
 | -------------- | ------------------------------------------------- | -------- | ------- |
 | `version`      | Version to publish. Used only when type is manual | No       | –       |
 | `github-token` | GitHub token for authentication                   | Yes      | –       |
+| `directory-build-props-path` | Path to `Directory.Build.props` file | No | `Directory.Build.props` |
 
 ## 📝 Example Usage
 
@@ -23,4 +24,5 @@ jobs:
               type: 'manual'
               version: '1.0.0-amazing-feature.1'
               github-token: ${{ secrets.PAT_TOKEN }}
+              directory-build-props-path: src/AcquisitionConnectorShl/Directory.Build.props
 ```

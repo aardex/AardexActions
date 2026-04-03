@@ -3,14 +3,18 @@ import xml.etree.ElementTree as ET
 import sys
 
 
-def extract_version_from_solution():
+def is_version_tag(tag):
+    return tag.split("}")[-1] == "Version"
+
+
+def extract_version_from_solution(props_file):
     """Extract the current version from Directory.Build.props"""
     try:
-        tree = ET.parse('Directory.Build.props')
+        tree = ET.parse(props_file)
         root = tree.getroot()
 
         for element in root.iter():
-            if element.tag in "Version":
+            if is_version_tag(element.tag):
                 return element.text.strip()
 
         print("The <Version> tag was not found in the Directory.Build.props file.")
@@ -85,14 +89,20 @@ def main():
 
     alpha_parser = subparsers.add_parser("alpha", help="Generate alpha version")
     alpha_parser.add_argument("--branch", required=True, help="Name of the branch")
+    alpha_parser.add_argument("--props-file", default="Directory.Build.props", help="Path to Directory.Build.props")
 
     rc_parser = subparsers.add_parser("rc", help="Generate release candidate version")
+    rc_parser.add_argument("--props-file", default="Directory.Build.props", help="Path to Directory.Build.props")
 
     release_parser = subparsers.add_parser("release", help="Generate release version")
+    release_parser.add_argument("--props-file", default="Directory.Build.props", help="Path to Directory.Build.props")
+
+    get_parser.add_argument("--props-file", default="Directory.Build.props", help="Path to Directory.Build.props")
 
     args = parser.parse_args()
 
-    current_version = extract_version_from_solution()
+    props_file = getattr(args, "props_file", "Directory.Build.props")
+    current_version = extract_version_from_solution(props_file)
     if not current_version:
         print("Invalid format", file=sys.stderr)
         sys.exit(1)

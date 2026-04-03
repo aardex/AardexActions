@@ -9,6 +9,10 @@ inputs:
     required: false
     description: "The version number (manual)"
     default: ""
+  directory-build-props-path:
+    required: false
+    description: "Path to Directory.Build.props"
+    default: "Directory.Build.props"
 
 runs:
   using: composite
@@ -30,12 +34,12 @@ runs:
       shell: bash
       run: |
         version="${{ inputs.version }}"
-        [[ -n "${{ inputs.version }}" ]] || version=$(python3 "${{ github.action_path }}/../scripts/nuget/generate-version.py" release)
+        [[ -n "${{ inputs.version }}" ]] || version=$(python3 "${{ github.action_path }}/../scripts/nuget/generate-version.py" release --props-file "${{ inputs.directory-build-props-path }}")
         echo "version=$version" >> $GITHUB_OUTPUT
 
     - name: Update package version
       shell: bash
-      run: python3 "${{ github.action_path }}/../scripts/nuget/update-version.py" --new-version ${{ steps.determine_version.outputs.version }}
+      run: python3 "${{ github.action_path }}/../scripts/nuget/update-version.py" --new-version ${{ steps.determine_version.outputs.version }} --props-file "${{ inputs.directory-build-props-path }}"
 
 
     - name: Commit Changes
