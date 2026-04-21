@@ -11,6 +11,10 @@ inputs:
   version:
     required: false
     description: "Version tag for the Docker image. If not provided, will use version from Directory.Build.props"
+  version-file-path:
+    required: false
+    default: ''
+    description: "Optional path to Directory.Build.props. If not provided, defaults to repository root Directory.Build.props."
   config-file-path:
     required: false
     default: ''
@@ -66,7 +70,8 @@ runs:
       if: ${{ inputs.version == '' }}
       shell: bash
       run: |
-        python3 "${{ github.action_path }}/../scripts/nuget/get_version.py" --set-output
+        version_file="${{ inputs.version-file-path != '' && inputs.version-file-path || 'Directory.Build.props' }}"
+        python3 "${{ github.action_path }}/../scripts/nuget/get_version.py" --file "$version_file" --set-output
 
     - name: Resolve version
       id: resolve_version

@@ -17,6 +17,10 @@ inputs:
   version:
     required: false
     description: "Version tag for the Docker image"
+  version-file-path:
+    required: false
+    default: ''
+    description: "Optional path to Directory.Build.props for version extraction"
   config-file-path:
     required: false
     default: ''
@@ -67,6 +71,7 @@ runs:
         environment: ${{ inputs.environment }}
         image-name: ${{ inputs.image-name }}
         version: ${{ inputs.version }}
+        version-file-path: ${{ inputs.version-file-path }}
         config-file-path: ${{ inputs.config-file-path }}
         github-token: ${{ inputs.github-token }}
         subscription-id: ${{ inputs.subscription-id }}
