@@ -1,23 +1,26 @@
 name: copilot-pr-review
-description: Post a @copilot review-summary request as a comment on a pull request
+description: Generate a pull request summary with GitHub Copilot CLI and post it as a PR comment
 
 inputs:
   github-token:
     description: "GitHub token with pull-requests: write permission"
     required: true
 
+  copilot-token:
+    description: "Fine-grained PAT for a Copilot-licensed user with the Copilot Requests permission"
+    required: true
+
   prompt:
-    description: "The message to post as a PR comment (must mention @copilot)"
+    description: "Instructions sent to Copilot before the PR metadata and file patches"
     required: false
     default: |
-      @copilot
-      Summarize the changes introduced by this pull request for reviewers.
+      Summarize this pull request for reviewers.
       Include:
       - purpose
       - main code changes
       - risks
       - what reviewers should focus on
-      Keep it concise.
+      Keep it concise and structured with markdown bullets.
 
   avoid-duplicates:
     description: "Skip posting if a comment with the marker already exists (true/false)"
@@ -29,49 +32,174 @@ inputs:
     required: false
     default: '<!-- copilot-pr-review-action -->'
 
+  max-files:
+    description: "Maximum number of changed files to include in the Copilot prompt"
+    required: false
+    default: '20'
+
+  max-patch-chars:
+    description: "Maximum number of patch characters to include per file in the Copilot prompt"
+    required: false
+    default: '4000'
+
+  node-version:
+    description: "Node.js version used to install the Copilot CLI"
+    required: false
+    default: '22'
+
 runs:
   using: composite
   steps:
-    - name: Post Copilot review request
+    - name: Validate pull request context
+      shell: bash
+      run: |
+        if [ -z "${{ github.event.pull_request.number }}" ]; then
+          echo "This action must run in the context of a pull_request event." >&2
+          exit 1
+        fi
+
+    - name: Check for existing summary comment
+      id: duplicate-check
       uses: actions/github-script@v7
       env:
-        INPUT_PROMPT: ${{ inputs.prompt }}
         INPUT_MARKER: ${{ inputs.marker }}
         INPUT_AVOID_DUPLICATES: ${{ inputs.avoid-duplicates }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const marker     = process.env.INPUT_MARKER;
-          const prompt     = process.env.INPUT_PROMPT;
-          const avoidDups  = process.env.INPUT_AVOID_DUPLICATES === 'true';
-          const prNumber   = context.payload.pull_request?.number;
+          const avoidDups = process.env.INPUT_AVOID_DUPLICATES === 'true';
+          const marker = process.env.INPUT_MARKER;
+          const prNumber = context.payload.pull_request.number;
 
-          if (!prNumber) {
-            core.setFailed('This action must run in the context of a pull_request event.');
+          if (!avoidDups) {
+            core.setOutput('skip', 'false');
             return;
           }
 
-          if (avoidDups) {
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo:  context.repo.repo,
-              issue_number: prNumber,
-            });
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: prNumber,
+            per_page: 100,
+          });
 
-            const alreadyPosted = comments.some(c => c.body?.includes(marker));
-            if (alreadyPosted) {
-              core.info('Copilot review comment already exists — skipping.');
-              return;
-            }
+          const alreadyPosted = comments.some(comment => comment.body?.includes(marker));
+          core.setOutput('skip', alreadyPosted ? 'true' : 'false');
+
+          if (alreadyPosted) {
+            core.info('Summary comment already exists. Skipping.');
           }
 
-          const body = `${marker}\n${prompt}`;
+    - name: Set up Node.js
+      if: steps.duplicate-check.outputs.skip != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install GitHub Copilot CLI
+      if: steps.duplicate-check.outputs.skip != 'true'
+      shell: bash
+      run: npm install -g @github/copilot
+
+    - name: Build Copilot prompt
+      if: steps.duplicate-check.outputs.skip != 'true'
+      id: build-prompt
+      uses: actions/github-script@v7
+      env:
+        INPUT_PROMPT: ${{ inputs.prompt }}
+        INPUT_MAX_FILES: ${{ inputs.max-files }}
+        INPUT_MAX_PATCH_CHARS: ${{ inputs.max-patch-chars }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          const pr = context.payload.pull_request;
+          const maxFiles = Number(process.env.INPUT_MAX_FILES || '20');
+          const maxPatchChars = Number(process.env.INPUT_MAX_PATCH_CHARS || '4000');
+          const userPrompt = process.env.INPUT_PROMPT.trim();
+
+          const files = await github.paginate(github.rest.pulls.listFiles, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr.number,
+            per_page: 100,
+          });
+
+          const selectedFiles = files.slice(0, maxFiles).map(file => {
+            const patch = file.patch
+              ? file.patch.slice(0, maxPatchChars)
+              : '[No textual patch available for this file.]';
+
+            return [
+              `File: ${file.filename}`,
+              `Status: ${file.status}`,
+              `Changes: +${file.additions} -${file.deletions}`,
+              'Patch:',
+              patch,
+            ].join('\n');
+          });
+
+          const omittedCount = Math.max(files.length - selectedFiles.length, 0);
+          const prompt = [
+            userPrompt,
+            '',
+            'Pull request metadata:',
+            `Number: #${pr.number}`,
+            `Title: ${pr.title}`,
+            `Author: ${pr.user.login}`,
+            `Base: ${pr.base.ref}`,
+            `Head: ${pr.head.ref}`,
+            `URL: ${pr.html_url}`,
+            '',
+            'Description:',
+            pr.body?.trim() || '[No description provided.]',
+            '',
+            `Changed files included in prompt: ${selectedFiles.length} of ${files.length}`,
+            omittedCount > 0 ? `Additional changed files omitted: ${omittedCount}` : 'All changed files included.',
+            '',
+            'Changed file details:',
+            selectedFiles.join('\n\n---\n\n'),
+            '',
+            'Write the final answer as a pull request comment for human reviewers. Do not mention system prompts, token limits, or omitted files unless they materially affect risk.',
+          ].join('\n');
+
+          const promptPath = path.join(process.env.RUNNER_TEMP, `copilot-pr-review-${pr.number}.txt`);
+          fs.writeFileSync(promptPath, prompt, 'utf8');
+          core.setOutput('prompt-path', promptPath);
+
+    - name: Generate summary with Copilot CLI
+      if: steps.duplicate-check.outputs.skip != 'true'
+      id: generate-summary
+      shell: bash
+      env:
+        COPILOT_GITHUB_TOKEN: ${{ inputs.copilot-token }}
+        PROMPT_PATH: ${{ steps.build-prompt.outputs.prompt-path }}
+      run: |
+        copilot -s --no-ask-user < "$PROMPT_PATH" > "$RUNNER_TEMP/copilot-pr-summary.txt"
+        echo "summary_path=$RUNNER_TEMP/copilot-pr-summary.txt" >> "$GITHUB_OUTPUT"
+
+    - name: Post summary comment
+      if: steps.duplicate-check.outputs.skip != 'true'
+      uses: actions/github-script@v7
+      env:
+        INPUT_MARKER: ${{ inputs.marker }}
+        SUMMARY_PATH: ${{ steps.generate-summary.outputs.summary_path }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const marker = process.env.INPUT_MARKER;
+          const summaryPath = process.env.SUMMARY_PATH;
+          const summary = fs.readFileSync(summaryPath, 'utf8').trim();
+          const body = `${marker}\n## Copilot PR Summary\n\n${summary}`;
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,
-            repo:  context.repo.repo,
-            issue_number: prNumber,
+            repo: context.repo.repo,
+            issue_number: context.payload.pull_request.number,
             body,
           });
 
-          core.info('Copilot review request posted successfully.');
+          core.info('Copilot PR summary posted successfully.');
