@@ -4,21 +4,20 @@ This composite GitHub Action creates a Terraform destroy plan for your Azure inf
 
 ## 🔑 Required Inputs
 
-| Input               | Description                                              |
-|---------------------|----------------------------------------------------------|
-| `azure-credentials` | Azure service principal JSON used by Terraform AzureRM  |
-| `github-token`      | Token to access private GitHub modules (read-only)       |
+| Input               | Description                                            |
+|---------------------|--------------------------------------------------------|
+| `azure-credentials` | Azure service principal JSON used by Terraform AzureRM |
+| `github-token`      | Token to access private GitHub modules (read-only)     |
 
 ## 📝 Optional Inputs
 
-| Input                | Description                                                                                   | Default      |
-|----------------------|-----------------------------------------------------------------------------------------------|--------------|
-| `azure-subscription` | Azure subscription to destroy in (defaults to `subscriptionId` in `azure-credentials`)       | `''`         |
-| `directory`          | Path to the Terraform working directory                                                       | `terraform`  |
-| `apply`              | Whether to run `terraform apply` on the generated destroy plan (`'true'` or `'false'`)       | `'false'`    |
-| `needs-approval`     | Manual approval gate before apply when `apply: 'true'`                                        | `'true'`     |
-| `tfvars-content`     | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input) | `''`         |
-| `plan-args`          | Additional arguments passed to `terraform plan` (e.g., `-refresh=true -replace=...`)         | `''`         |
+| Input                | Description                                                                                  | Default     |
+|----------------------|----------------------------------------------------------------------------------------------|-------------|
+| `azure-subscription` | Azure subscription to destroy in (defaults to `subscriptionId` in `azure-credentials`)       | `''`        |
+| `directory`          | Path to the Terraform working directory                                                      | `terraform` |
+| `apply`              | Whether to run `terraform apply` on the generated destroy plan (`'true'` or `'false'`)       | `'false'`   |
+| `tfvars-content`     | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input) | `''`        |
+| `plan-args`          | Additional arguments passed to `terraform plan` (e.g., `-refresh=true -replace=...`)         | `''`        |
 
 ## 📦 What it does
 
@@ -32,8 +31,6 @@ This composite GitHub Action creates a Terraform destroy plan for your Azure inf
 - Supports passing additional flags via `plan-args`.
 - Apply behavior:
 - If `apply: 'false'` (default), no apply is executed (plan only).
-- If `apply: 'true'` and `needs-approval: 'true'`, manual approval is required before apply.
-- If `apply: 'true'` and `needs-approval: 'false'`, apply runs immediately.
 
 ### azure-credentials
 ```
@@ -59,26 +56,3 @@ This composite GitHub Action creates a Terraform destroy plan for your Azure inf
       plan-args: "-refresh=true"
 ```
 
-### Apply with manual approval (recommended)
-```
-  - name: Terraform destroy apply (with approval)
-    uses: your-org/terraform-destroy@v1
-    with:
-      azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      github-token: ${{ secrets.PAT_TOKEN }}
-      directory: 'infra/terraform'
-      apply: 'true'
-      needs-approval: 'true'
-```
-
-### Apply immediately without approval (use with caution)
-```
-  - name: Terraform destroy apply (no approval)
-    uses: your-org/terraform-destroy@v1
-    with:
-      azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      github-token: ${{ secrets.PAT_TOKEN }}
-      directory: 'infra/terraform'
-      apply: 'true'
-      needs-approval: 'false'
-```

@@ -16,10 +16,6 @@ inputs:
     required: false
     default: 'false'
     description: "Whether to run terraform apply on the destroy plan"
-  needs-approval:
-    required: false
-    default: 'true'
-    description: "Whether to require manual approval before applying the destroy plan"
   tfvars-content:
     required: false
     description: "Content of the terraform.tfvars file (as a single string, from secrets or workflow input)"
@@ -119,24 +115,8 @@ runs:
           ${{ inputs.directory }}/result.txt
         retention-days: 15
 
-    - name: Manual Approval
-      if: ${{ inputs.apply == 'true' && inputs.needs-approval == 'true' }}
-      uses: trstringer/manual-approval@v1.12.0
-      with:
-        secret: ${{ inputs.github-token }}
-        approvers: 'Developers'
-        minimum-approvals: 1
-        issue-title: 'Approve Terraform Destroy'
-        issue-body: 'Please review and approve the Terraform destroy operation.'
-
-    - name: Terraform Apply Destroy (with approval)
-      if: ${{ inputs.apply == 'true' && inputs.needs-approval == 'true' }}
-      shell: bash
-      working-directory: ${{ inputs.directory }}
-      run: terraform apply -input=false -auto-approve tfdestroy.tfplan
-
-    - name: Terraform Apply Destroy (without approval)
-      if: ${{ inputs.apply == 'true' && inputs.needs-approval != 'true' }}
+    - name: Terraform Apply Destroy
+      if: ${{ inputs.apply == 'true'}}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: terraform apply -input=false -auto-approve tfdestroy.tfplan
