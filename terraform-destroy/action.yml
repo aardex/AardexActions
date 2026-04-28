@@ -5,10 +5,17 @@ inputs:
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
+  azure-subscription:
+    required: false
+    description: "Azure subscription to destroy in (defaults to subscription in credentials)"
   directory:
     required: false
     default: 'terraform'
     description: Terraform working directory
+  apply:
+    required: false
+    default: 'false'
+    description: "Whether to run terraform apply on the destroy plan"
   needs-approval:
     required: false
     default: 'true'
@@ -16,6 +23,10 @@ inputs:
   tfvars-content:
     required: false
     description: "Content of the terraform.tfvars file (as a single string, from secrets or workflow input)"
+  plan-args:
+    required: false
+    default: ''
+    description: "Additional arguments to pass to terraform plan (e.g., '-refresh=true -replace=xxx')"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -25,11 +36,14 @@ runs:
   steps:
     - name: Extract Azure credentials
       shell: bash
-      id: creds
       run: |
         echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
         echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        if [ -n "${{ inputs.azure-subscription }}" ]; then
+          echo "ARM_SUBSCRIPTION_ID=${{ inputs.azure-subscription }}" >> $GITHUB_ENV
+        else
+          echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
+        fi
         echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
 
     - name: Setup Terraform
@@ -46,12 +60,14 @@ runs:
       if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
+      env:
+        TFVARS_CONTENT: ${{ inputs.tfvars-content }}
       run: |
         echo "📝 Creating terraform.tfvars from input"
-        cat <<EOF > terraform.tfvars
-        ${{ inputs.tfvars-content }}
-        EOF
-        echo "::add-mask::${{ inputs.tfvars-content }}"
+        while IFS= read -r line; do
+          echo "::add-mask::$line"
+        done <<< "$TFVARS_CONTENT"
+        printf '%s\n' "$TFVARS_CONTENT" > terraform.tfvars
         echo "✅ terraform.tfvars created successfully"
 
     - name: Terraform Init
@@ -68,22 +84,23 @@ runs:
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
+        PLAN_ARGS="${{ inputs.plan-args }}"
+
         if [ -f "terraform.tfvars" ]; then
           echo "✅ terraform.tfvars found, using it."
-          terraform plan \
-            -destroy \
-            -input=false \
-            -no-color \
-            -var-file="terraform.tfvars" \
-            -out=tfdestroy.tfplan > result.txt 2>&1
+          CMD=(terraform plan -destroy -input=false -no-color -var-file="terraform.tfvars")
         else
           echo "⚠️ No terraform.tfvars found, running destroy plan without it."
-          terraform plan \
-            -destroy \
-            -input=false \
-            -no-color \
-            -out=tfdestroy.tfplan > result.txt 2>&1
+          CMD=(terraform plan -destroy -input=false -no-color)
         fi
+
+        if [ -n "$PLAN_ARGS" ]; then
+          echo "ℹ️ Adding custom plan arguments: $PLAN_ARGS"
+          CMD+=($PLAN_ARGS)
+        fi
+
+        CMD+=(-out=tfdestroy.tfplan)
+        "${CMD[@]}" > result.txt 2>&1
 
     - name: Terraform Show Destroy Plan
       if: always()
@@ -103,17 +120,23 @@ runs:
         retention-days: 15
 
     - name: Manual Approval
-      if: ${{ inputs.needs-approval == 'true' }}
+      if: ${{ inputs.apply == 'true' && inputs.needs-approval == 'true' }}
       uses: trstringer/manual-approval@v1.9.0
       with:
-        secret: ${{ secrets.PAT_TOKEN }}
+        secret: ${{ inputs.github-token }}
         approvers: 'Developers'
         minimum-approvals: 1
         issue-title: 'Approve Terraform Destroy'
         issue-body: 'Please review and approve the Terraform destroy operation.'
 
-    - name: Terraform Apply Destroy (after approval)
-      if: ${{ inputs.needs-approval == 'true' }}
+    - name: Terraform Apply Destroy (with approval)
+      if: ${{ inputs.apply == 'true' && inputs.needs-approval == 'true' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: terraform apply -input=false -auto-approve tfdestroy.tfplan
+
+    - name: Terraform Apply Destroy (without approval)
+      if: ${{ inputs.apply == 'true' && inputs.needs-approval != 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: terraform apply -input=false -auto-approve tfdestroy.tfplan
