@@ -25,7 +25,7 @@ This GitHub Action initializes, validates, plans, and optionally applies Terrafo
 - Exports ARM_ environment variables from `azure-credentials` (clientId, clientSecret, subscriptionId, tenantId).
 - If `azure-subscription` is provided, it overrides the `subscriptionId` from `azure-credentials`.
 - Installs Terraform 1.13.3.
-- Configures Git to use `github-token` for private module sources.
+- Configures Git to use `github-token` for private GitHub module sources using either `git::https://github.com/...` or `git::ssh://git@github.com/...` / `git@github.com:...` style URLs. The token must have read access to every private module repository referenced by the Terraform configuration.
 - Optionally writes `tfvars-content` to `terraform.tfvars` in the working directory.
 - Runs `terraform init -upgrade`, `terraform validate`, and `terraform plan`.
 - Supports passing additional plan flags through `plan-args` (e.g., `-refresh=true` or `-replace=...`).
