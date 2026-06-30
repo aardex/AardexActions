@@ -56,16 +56,23 @@ runs:
     - name: Configure Git credential URL
       shell: bash
       env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
+        PRIVATE_MODULES_GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
-        if [ -z "$GITHUB_TOKEN" ]; then
+        if [ -z "$PRIVATE_MODULES_GITHUB_TOKEN" ]; then
           echo "github-token input is required for private Terraform module access."
           exit 1
         fi
 
-        echo "::add-mask::$GITHUB_TOKEN"
-        git config --global --add url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-        git config --global --add url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "git@github.com:"
+        echo "::add-mask::$PRIVATE_MODULES_GITHUB_TOKEN"
+        {
+          echo "PRIVATE_MODULES_GITHUB_TOKEN=$PRIVATE_MODULES_GITHUB_TOKEN"
+          echo "GIT_TERMINAL_PROMPT=0"
+        } >> "$GITHUB_ENV"
+
+        git config --global credential.https://github.com.username x-access-token
+        git config --global credential.https://github.com.helper '!f() { test "$1" = get && echo username=x-access-token && echo "password=$PRIVATE_MODULES_GITHUB_TOKEN"; }; f'
+        git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+        git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
     - name: Create terraform.tfvars from input
       if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
