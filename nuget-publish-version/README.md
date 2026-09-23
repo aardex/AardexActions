@@ -1,13 +1,12 @@
-# Create Release Version Action
+# Publish a versioned NuGet package
 
-This GitHub Action allows you to automatically increment, publish, and push a **release** (stable) version of your NuGet package.  
-It is tailored to fit smoothly into your CI/CD pipeline and supports all standard .NET projects.
+This action computes an alpha, release-candidate or release version (or accepts a manual version), updates the consumer's `Directory.Build.props`, builds, tests, packs and pushes to GitHub Packages. It does **not** commit or push the source changes. See [deployment](../docs/deployment.md) and [configuration](../docs/configuration.md).
 
 ## 🛠️ Inputs
 
 | Input            | Description                                                         | Required | Default |
 |------------------|---------------------------------------------------------------------|----------|---------|
-| `project`        | Path to the `.csproj` to publish                                    | Yes      | –       |
+| `project`        | Directory containing a same-named `.csproj`                                    | Yes      | –       |
 | `dotnet-version` | .NET SDK version to use                                             | No       | 8.x     |
 | `type`           | Type of version to publish <alpha/release-candidate/release/manual> | Yes      | -       |
 | `version`        | Version to publish. Used only when type is manual                   | No       | –       |
@@ -17,16 +16,16 @@ It is tailored to fit smoothly into your CI/CD pipeline and supports all standar
 
 | Output    | Description                     |
 |-----------|---------------------------------|
-| `version` | The generated release version   |
+| `version` | The determined package version   |
 
 ## 📝 Example Usage
 
 ```yaml 
 jobs: 
-    release: 
-    runs-on: ubuntu-latest 
-    steps: 
-        - name: Create Release Version 
+    release:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Publish version
           uses: aardex/AardexActions/nuget-publish-version@main
           with: 
               project: 'src/MyProject' 

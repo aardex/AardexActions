@@ -25,7 +25,7 @@ jobs:
         runs-on: ubuntu-latest 
         steps:
           - name: Create Tag and Release 
-            uses: aardex/create-tag-and-release@v1 
+            uses: aardex/AardexActions/github-create-tag-release@main
             with: 
                 version: '1.2.3' 
                 github-token: ${{ secrets.GITHUB_TOKEN }} 
@@ -38,5 +38,5 @@ jobs:
 
 - Checks out your repository
 - Creates a Git tag (e.g., `v1.2.3`)
-- Publishes a GitHub release with customizable name, body, and release options
+- Publishes a GitHub release named `Release <version>` with a fixed `Release <version>` body and configurable draft/prerelease flags in the consumer repository
 - Optionally attaches files to your release

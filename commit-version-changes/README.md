@@ -7,7 +7,7 @@ This GitHub Action automates updating a NuGet package version and committing the
 The action performs the following tasks:
 
 - Checks out the target repository.
-- Checks out a custom action repository (`aardex/AardexActions`) containing a Python script.
+- Runs the version update script adjacent to this action.
 - Updates the NuGet package version using the provided script.
 - Commits and pushes the changes using the provided version number as the commit message.
 
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Commit Version Update
-        uses: your-org/commit-version-action@v1
+        uses: aardex/AardexActions/commit-version-changes@main
         with:
           version: '1.2.3'
           github-token: ${{ secrets.PAT_TOKEN }}

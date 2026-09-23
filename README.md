@@ -1,43 +1,25 @@
-# Aardex Actions for Github
+# Aardex Actions
 
-This project includes github actions that can be used through our CI/CD chains, in particular to validate Terraform modules or generate documentation.
+Reusable composite GitHub Actions for CI/CD in consumer repositories: Terraform validation, documentation and Azure plans; Azure application and image delivery; .NET/NuGet versioning and publication; and GitHub repository automation. This repository contains action definitions and supporting scripts, **not** an application, Terraform stack or .NET solution. A consumer invokes an action at `aardex/AardexActions/<directory>@<ref>` from its own workflow. Check that directory's `action.yml` for the executable input/output contract and its README for usage.
 
-## Available Actions
+The GitHub organization in the action references is `aardex`; this repository does not identify a named maintainer, escalation owner or approval authority. Confirm ownership and access with the organization maintainers rather than assuming a contact from a commit or token name.
 
-> ⚠️ **Important Note**  
-> Several actions in this repository are interdependent and reference each other using the `main` branch (e.g., `uses: aardex/AardexActions/dotnet-build@main`). When making changes or conducting tests:
-> - Be aware that modifying an action might affect other actions that depend on it
-> - Consider using a different branch for testing to avoid disrupting existing workflows
-> - Update the branch references in dependent actions if you need to test changes
-> - Always thoroughly test changes across all dependent actions before merging to `main`
+## Actions
 
-### Azure
-- Deploy [Azure Dotnet Function](./azure-dotnet-function-deploy/README.md): Deploy a .NET function to Azure Functions service
-- Deploy [Azure Dotnet App Service](./azure-dotnet-app-service-deploy/README.md): Deploy a .NET application to Azure App Service
+| Area | Action directories |
+| --- | --- |
+| Azure applications and images | [Container App deploy](azure-container-app-deploy/README.md), [.NET App Service deploy](azure-dotnet-app-service-deploy/README.md), [.NET Function deploy](azure-dotnet-function-deploy/README.md), [Java App Service deploy](azure-java-app-service-deploy/README.md), [Docker image publish](azure-publish-docker/README.md), [.NET Docker image publish](azure-publish-dotnet-docker/README.md) |
+| .NET / NuGet | [.NET build](dotnet-build/README.md), [component release](dotnet-component-release/README.md), [alpha](nuget-publish-alpha/README.md), [release candidate](nuget-publish-release-candidate/README.md), [release](nuget-publish-release/README.md), [versioned publish](nuget-publish-version/README.md) |
+| GitHub / versioning | [commit and push](github-commit-push/README.md), [commit version](commit-version-changes/README.md), [create tag and release](github-create-tag-release/README.md), [update version](github-version-update/README.md), [Copilot PR review request](copilot-pr-review/README.md) |
+| Terraform | [deploy](terraform-deploy/README.md), [destroy](terraform-destroy/README.md), [docs](terraform-docs/README.md), [docs index](terraform-docs-index/README.md), [format and validate](terraform-format-validate/README.md), [module directories](terraform-module-directories/README.md), [version update](terraform-version-update/README.md) |
 
-### Dotnet Nuget
-> ⚠️ **Important Note**  
-> If you want to use the Nuget workflows, in the project root you must have a **`Directory.Build.props`** file with the following content:
-> ```xml
-> <Project>
->     <PropertyGroup>
->         <Version>0.6.17-alpha.8.0</Version>
->     </PropertyGroup>
-> </Project>
-> ```
-> **And EVERY .csproj doesn't have a version tag**
-- Create [Alpha Version](./nuget-publish-alpha/README.md): Automatically generate and publish an alpha NuGet package version for early testing
-- Create [Release Candidate Version](./nuget-publish-release-candidate/README.md): Increment and publish a release candidate NuGet version for pre-release validation
-- Create [Release Version](./nuget-publish-release/README.md): Increment and publish a stable NuGet package version for production use
+## Maintainer guide
 
-### GitHub
-- [Commit New Version](./commit-version-changes/README.md): Automatically commit and push version changes to repository
-- [Copilot PR Review](./copilot-pr-review/README.md): Post a @copilot review-summary request as a comment on a pull request
+- [Architecture and boundaries](docs/architecture.md) — composition, script ownership and decision records
+- [Development and checks](docs/development.md) — local setup, safe validation and consumer testing
+- [Configuration and secrets](docs/configuration.md) — input and credential boundaries
+- [Deployment and release](docs/deployment.md) — publication and potentially destructive actions
+- [Operations](docs/operations.md) and [troubleshooting](docs/troubleshooting.md) — available signals and diagnostics
+- [Change history](CHANGELOG.md) — recorded repository changes and history limitations
 
-### Terraform
-- [Terraform Deploy to Azure](./terraform-deploy/README.md): Init, validate, plan, and optionally apply Terraform with optional manual approval
-- [Terraform Destroy for Azure](./terraform-destroy/README.md): Plan a destroy and, with approval, apply it; uploads artifacts for review
-- Generate [Terraform Docs](./terraform-docs/README.md): Generate comprehensive documentation for a given Terraform module
-- Create [Terraform Docs Index](./terraform-docs-index/README.md): Generate an index of documentation for all Terraform modules
-- [Terraform Format and Validate](./terraform-format-validate/README.md): Format and validate Terraform code in a specified folder
-- Search for [Terraform Modules Directories](./terraform-module-directories/README.md): Locate and list all Terraform module directories in a repository
+**Version coupling:** a reference to `@main` follows the current branch, not a frozen version. Several actions call other actions in this repository using `@main`, even when the caller is pinned to another ref. Inspect transitive references in `action.yml` before changing or testing an action; test in a disposable consumer workflow with a pinned commit/ref where possible. A component README is guidance for this revision, not a guarantee for other refs. No repository-wide release workflow or compatibility policy is defined here.

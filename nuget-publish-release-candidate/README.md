@@ -7,8 +7,8 @@ It easily integrates with your CI/CD pipeline for standard .NET projects, provid
 
 | Input           | Description                             | Required | Default |
 |-----------------|-----------------------------------------|----------|---------|
-| `project`       | Path to the `.csproj` to publish        | Yes      | –       |
-| `dotnet-version`| .NET SDK version to use                 | No       | –       |
+| `project`       | Directory containing a same-named `.csproj` | Yes | – |
+| `dotnet-version`| .NET SDK version to use | No | `8.x` |
 | `github-token`  | GitHub token for authentication         | Yes      | –       |
 
 ## 🎁 Outputs
@@ -25,7 +25,7 @@ jobs:
         runs-on: ubuntu-latest 
         steps: 
           - name: Create Release Candidate Version 
-            uses: aardex/create-release-candidate-version@v1 
+            uses: aardex/AardexActions/nuget-publish-release-candidate@main
             with: 
                 project: 'src/MyProject' 
                 dotnet-version: '10.0.x'
@@ -37,5 +37,5 @@ jobs:
 - **Release Candidate Versioning:** Automatically increments your package to the next release candidate (e.g., `1.0.0-rc.*`).
 - **Project Validation:** Ensures your `.csproj` includes the correct `RepositoryUrl` and `RepositoryType` fields.
 - **Customizable SDK:** Select the .NET SDK version and project location easily.
-- **Secure Publishing:** Publishes securely to GitHub Packages using your provided token.
+- **Publishing:** Pushes to GitHub Packages using the supplied token; see [configuration](../docs/configuration.md). It does not commit or push source changes.
 - **End-to-End Automation:** Handles building, testing, packaging, and publishing for seamless pre-release workflows.

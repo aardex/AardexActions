@@ -28,17 +28,17 @@ jobs:
         runs-on: ubuntu-latest 
         steps: 
           - name: Deploy .NET App Service 
-            uses: aardex/deploy-dotnet-app-service@v1 
-            with: 
-            environment: 'production'
-            azure-environment: 'prod' 
-            project: 'src/MyApp' 
-            app-name: 'my-awesome-app' 
-            github-token: {{ secrets.PAT_TOKEN }}
-            azure-profile: {{ secrets.AZURE_PUBLISH_PROFILE }}
-            dotnet-version: '10.0.x' 
-            config-file-path: 'src/MyFunctionApp/appsettings.json'
-            codecov-token: ${{ secrets.CODECOV_TOKEN }
+            uses: aardex/AardexActions/azure-dotnet-app-service-deploy@main
+            with:
+              environment: 'production'
+              azure-environment: 'prod'
+              project: 'src/MyApp'
+              app-name: 'my-awesome-app'
+              github-token: ${{ secrets.PAT_TOKEN }}
+              azure-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+              dotnet-version: '10.0.x'
+              config-file-path: 'src/MyApp/appsettings.json'
+              codecov-token: ${{ secrets.CODECOV_TOKEN }}
 ```
 
 ## ✨ Features
@@ -46,7 +46,7 @@ jobs:
 - Checks out your repository and any required shared action sources
 - Optionally installs Python dependencies and updates configuration via scripts
 - Builds and packages your .NET application with the specified .NET SDK version
-- Optionally integrates code coverage reporting with Codecov
+- Runs tests with coverage and invokes Codecov with the supplied optional token; see [configuration](../docs/configuration.md) for generated config and credential handling
 - Deploys your application to Azure App Service using the [Azure Web Apps Deploy Action](https://github.com/marketplace/actions/azure-webapps-deploy)
 
 Deployment to Azure Web App leverages the [Azure Web Apps Deploy GitHub Action](https://github.com/marketplace/actions/azure-webapps-deploy).

@@ -1,4 +1,4 @@
-# Deploy Dotnet App Service Action
+# Deploy Java App Service Action
 
 This GitHub Action builds and deploys a Java application to Azure App Service, making it easy to automate your cloud application delivery using GitHub Actions.
 
@@ -17,7 +17,7 @@ This GitHub Action builds and deploys a Java application to Azure App Service, m
 
 | Input               | Description                                              | Default   |
 |---------------------|----------------------------------------------------------|-----------|
-| `java-version`      | Path to configuration file                               | `11`      |
+| `java-version`      | Java version                               | `11`      |
 | `gradle-version`    | Gradle version to use                              	     | `8.10`    |
 | `pre-build`         | A pre build step command                              	 | -         |
 | `codecov-token`     | Codecov token (for coverage reports)                     | -         |
@@ -35,18 +35,18 @@ jobs:
               azure-environment: 'prod' 
               project: 'src/MyApp' 
               app-name: 'my-awesome-app' 
-              github-token: {{ secrets.PAT_TOKEN }}
-              azure-profile: {{ secrets.AZURE_PUBLISH_PROFILE }}
+              github-token: ${{ secrets.PAT_TOKEN }}
+              azure-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
               java-version: '11' 
               gradle-version: '8.10' 
               pre-build: |
                 echo "My pre build step"
-              codecov-token: ${{ secrets.CODECOV_TOKEN }
+              codecov-token: ${{ secrets.CODECOV_TOKEN }}
 ```
 
 ## ✨ Features
 
-- Checks out your repository and any required shared action sources
+- Checks out the consumer repository; see [configuration](../docs/configuration.md) for credentials
 - Optionally perform pre build task 
 - Builds and packages java application in a WAR file
 - Optionally integrates code coverage reporting with Codecov
