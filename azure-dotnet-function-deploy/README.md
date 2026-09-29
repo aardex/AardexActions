@@ -29,24 +29,24 @@ jobs:
         runs-on: ubuntu-latest 
         steps: 
           - name: Deploy .NET Azure Function 
-            uses: aardex/deploy-dotnet-function@v1 
+            uses: aardex/AardexActions/azure-dotnet-function-deploy@main
             with: 
               environment: 'production' 
               azure-environment: 'prod' 
               project: 'src/MyFunctionApp' 
               func-name: 'my-awesome-func' 
-              github-token: {{ secrets.PAT_TOKEN }} 
-              azure-profile: {{ secrets.AZURE_PUBLISH_PROFILE }} 
+              github-token: ${{ secrets.PAT_TOKEN }}
+              azure-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
               dotnet-version: '10.0.x' 
               config-file-path: 'src/MyFunctionApp/appsettings.json'
               codecov-token: ${{ secrets.CODECOV_TOKEN }}
 ```
 ## ✨ Features
 
-- Checks out your code and a shared actions repository
+- Checks out the consumer repository
 - Optionally updates configuration via Python script
 - Builds and packages the .NET Azure Function using the specified .NET version
-- Optionally uploads code coverage reports using Codecov
+- Runs tests with coverage flags; `codecov-token` is declared but no Codecov upload step is implemented. See [configuration](../docs/configuration.md) for config handling
 - Deploys to Azure Functions using your chosen plan (standard or flex consumption)
 
 ---

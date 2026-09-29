@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Build and Test
-      uses: aardex/dotnet-build@v1
+      uses: aardex/AardexActions/dotnet-build@main
       with:
         github-token: ${{ secrets.PAT_TOKEN }}
         codecov-token: ${{ secrets.CODECOV_TOKEN }}

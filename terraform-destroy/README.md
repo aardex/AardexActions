@@ -1,58 +1,27 @@
-# Terraform Destroy for Azure
+# Terraform destroy for Azure
 
-This composite GitHub Action creates a Terraform destroy plan for your Azure infrastructure and, optionally (after manual approval), applies it.
+This composite action generates a saved **destroy plan** and optionally applies it. There is **no built-in manual approval**. See [deployment](../docs/deployment.md) and [configuration](../docs/configuration.md) for approval and plan-data boundaries.
 
-## 🔑 Required Inputs
+| Input | Required | Default / behavior |
+| --- | --- | --- |
+| `azure-credentials` | Yes | Azure service-principal JSON (`clientId`, `clientSecret`, `tenantId`, `subscriptionId`) |
+| `github-token` | Yes | Token for private GitHub Terraform modules |
+| `azure-subscription` | No | Overrides subscription from credentials |
+| `directory` | No | `terraform` |
+| `apply` | No | `'false'`; `'true'` runs `terraform apply -input=false -auto-approve tfdestroy.tfplan` |
+| `tfvars-content` | No | Writes `terraform.tfvars` in `directory` when nonempty |
+| `plan-args` | No | Extra whitespace-split Terraform plan arguments |
 
-| Input               | Description                                            |
-|---------------------|--------------------------------------------------------|
-| `azure-credentials` | Azure service principal JSON used by Terraform AzureRM |
-| `github-token`      | Token to access private GitHub modules (read-only)     |
+The action exports `ARM_*` credentials, installs Terraform 1.13.3, configures Git for private modules, then runs `terraform init -upgrade -input=false`, `terraform validate -no-color` and `terraform plan -destroy -out=tfdestroy.tfplan`. It attempts `terraform show -json` and uploads `tfdestroy.tfplan`, `tfdestroy.json` and `result.txt` as `tfdestroy` with 15-day retention even on failure where possible. These artifacts and the generated tfvars file can contain sensitive data; the Git URL configuration includes the token on the runner.
 
-## 📝 Optional Inputs
-
-| Input                | Description                                                                                  | Default     |
-|----------------------|----------------------------------------------------------------------------------------------|-------------|
-| `azure-subscription` | Azure subscription to destroy in (defaults to `subscriptionId` in `azure-credentials`)       | `''`        |
-| `directory`          | Path to the Terraform working directory                                                      | `terraform` |
-| `apply`              | Whether to run `terraform apply` on the generated destroy plan (`'true'` or `'false'`)       | `'false'`   |
-| `tfvars-content`     | Literal content for `terraform.tfvars` (single string, e.g., from secrets or workflow input) | `''`        |
-| `plan-args`          | Additional arguments passed to `terraform plan` (e.g., `-refresh=true -replace=...`)         | `''`        |
-
-## 📦 What it does
-
-- Exports `ARM_` environment variables from `azure-credentials` (clientId, clientSecret, subscriptionId, tenantId).
-- If `azure-subscription` is provided, it overrides `subscriptionId` from `azure-credentials`.
-- Installs Terraform 1.13.3.
-- Configures Git to use `github-token` for private module sources.
-- Optionally writes `tfvars-content` to `terraform.tfvars` in the working directory.
-- Runs `terraform init -upgrade`, `terraform validate`.
-- Creates a destroy plan using `terraform plan -destroy` and uploads artifacts: `tfdestroy.tfplan`, `tfdestroy.json`, and `result.txt`.
-- Supports passing additional flags via `plan-args`.
-- Apply behavior:
-- If `apply: 'false'` (default), no apply is executed (plan only).
-
-### azure-credentials
-```
-{
-  "clientSecret": "<service principal secret>",
-  "subscriptionId": "<azure subscription id>",
-  "tenantId": "<azure tenant id>",
-  "clientId": "<service principal client id>"
-}
+```yaml
+- name: Review destroy plan only
+  uses: aardex/AardexActions/terraform-destroy@main
+  with:
+    azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
+    github-token: ${{ secrets.PRIVATE_MODULES_TOKEN }}
+    directory: infra/terraform
+    apply: 'false'
 ```
 
-## 🚀 Usage Examples
-
-### Plan only (no apply)
-```
-  - name: Terraform destroy plan only
-    uses: your-org/terraform-destroy@v1
-    with:
-      azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-      github-token: ${{ secrets.PAT_TOKEN }}
-      directory: 'infra/terraform'
-      apply: 'false'
-      plan-args: "-refresh=true"
-```
-
+Do not set `apply: 'true'` without consumer-owned approval and explicit target/plan verification. `@main` is mutable; use a reviewed ref where possible.
