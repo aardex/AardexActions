@@ -39,7 +39,6 @@ Pin **every** wrapper to the full reviewed **merged AardexActions commit SHA**. 
 | --- | --- | --- |
 | `command` | Required | `validate-pr`, `propose`, `resolve`, `publish` |
 | `pr` | Empty | Positive PR number; required except for `propose` |
-| `github-token` | `${{ github.token }}` | Consumer's native `GITHUB_TOKEN`; no PAT/App required |
 | `trunk-branch` | `main` | Reviewed default/trunk branch |
 | `version-file` | `version.txt` | Sole stable SemVer authority |
 | `changelog-file` | `CHANGELOG.md` | Preserved history plus generated notes |
@@ -78,7 +77,7 @@ Unset outputs are empty. Failure produces no success result.
 | Publish (merged PR or recovery dispatch) | `contents: write`, `pull-requests: read` |
 | Optional standalone resolve | `contents: read`, `pull-requests: read` |
 
-The default token comes from the consumer job. The token is sent only to GitHub APIs and to Git fetch through a scoped child environment, never in command arguments, logs or persisted Git configuration. API diagnostics omit bodies/headers. No Administration, Actions/Workflows write, cloud, package or identity token permissions are needed. A fresh exact-SHA tag is created first; Release creation uses default trunk only as an unused creation hint. This avoids GitHub's Workflows-write check for recovery of an older source containing different workflows, which native `GITHUB_TOKEN` cannot satisfy. The tag and deterministic body, not a moving branch, prove release source identity. See [GitHub token permissions](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token).
+The action binds `GH_TOKEN` directly to `${{ github.token }}` from the consumer job. Native `GITHUB_TOKEN` is sufficient; the public interface exposes no credential override and consumers do not pass a token. PAT/GitHub App credentials are outside the V1 interface. The token is sent only to GitHub APIs and to Git fetch through a scoped child environment, never in command arguments, logs or persisted Git configuration. API diagnostics omit bodies/headers. No Administration, Actions/Workflows write, cloud, package or identity token permissions are needed. A fresh exact-SHA tag is created first; Release creation uses default trunk only as an unused creation hint. This avoids GitHub's Workflows-write check for recovery of an older source containing different workflows, which native `GITHUB_TOKEN` cannot satisfy. The tag and deterministic body, not a moving branch, prove release source identity. See [GitHub token permissions](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token).
 
 Privileged workflows checkout only trusted trunk. The action executes its own pinned `release.py` via isolated Python (`-I`), so consumer modules cannot shadow the shared engine/stdlib. PR objects are fetched and inspected with Git as data; no PR checkout, installation, imports or shell execution occurs. Normal PRs cannot change version/history/candidate/baseline. Workflow/engine changes follow ordinary human-reviewed PRs. Pinning reviewed code is part of the trust boundary.
 

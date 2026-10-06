@@ -19,8 +19,9 @@ def check():
     action = yaml.safe_load((ROOT / 'action.yml').read_text())
     assert action['runs']['using'] == 'composite'
     inputs = action['inputs']
+    assert 'github-token' not in inputs, 'Credential overrides are outside the public interface'
     assert set(inputs) == {
-        'command', 'pr', 'github-token', 'trunk-branch', 'version-file', 'changelog-file',
+        'command', 'pr', 'trunk-branch', 'version-file', 'changelog-file',
         'candidate-file', 'baseline-file', 'managed-branch', 'release-name', 'tag-prefix',
         'immutability-confirmed',
     }
@@ -28,8 +29,10 @@ def check():
     assert set(action['outputs']) == {'result', 'pr', 'head-sha', 'version', 'sha', 'tag', 'release-url', 'immutable'}
     step, = action['runs']['steps']
     assert step['id'] == 'engine' and step['shell'] == 'bash'
+    assert step['env']['GH_TOKEN'] == '${{ github.token }}', 'Use the consumer native GITHUB_TOKEN directly'
     # Data enters through environment variables, never shell expression interpolation.
-    assert '${{' not in step['run']
+    assert '${{' not in step['run'], 'Never interpolate context or secret expressions into shell code'
+    assert 'GH_TOKEN' not in step['run'] and 'GITHUB_TOKEN' not in step['run'], 'Keep token values out of shell code'
     assert 'python3 -I "$RELEASE_ACTION_PATH/release.py"' in step['run']
     for name in re.findall(r'inputs\.([\w-]+)', str(step['env'])):
         assert name in inputs, name

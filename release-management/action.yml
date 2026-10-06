@@ -8,10 +8,6 @@ inputs:
     description: 'PR number; required except for propose'
     required: false
     default: ''
-  github-token:
-    description: 'Consumer native GITHUB_TOKEN'
-    required: false
-    default: '${{ github.token }}'
   trunk-branch:
     description: 'Consumer trunk branch'
     required: false
@@ -82,7 +78,7 @@ runs:
         RELEASE_ACTION_PATH: ${{ github.action_path }}
         RELEASE_COMMAND: ${{ inputs.command }}
         RELEASE_PR: ${{ inputs.pr }}
-        GH_TOKEN: ${{ inputs.github-token }}
+        GH_TOKEN: ${{ github.token }}
         RELEASE_TRUNK: ${{ inputs.trunk-branch }}
         RELEASE_VERSION_FILE: ${{ inputs.version-file }}
         RELEASE_CHANGELOG_FILE: ${{ inputs.changelog-file }}
