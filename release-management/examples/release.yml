@@ -1,0 +1,37 @@
+name: Publish approved release
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      release_pr:
+        description: Already merged human-approved Release PR number
+        required: true
+        type: string
+permissions:
+  contents: write
+  pull-requests: read
+concurrency:
+  group: release-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.event.repository.default_branch == 'main' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.merged == true &&
+       github.event.pull_request.head.ref == 'release/managed') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: aardex/AardexActions/release-management@REVIEWED_MERGED_SHA
+        with:
+          command: publish
+          pr: ${{ github.event.pull_request.number || inputs.release_pr }}
+          immutability-confirmed: ${{ vars.RELEASE_IMMUTABILITY_CONFIRMED }}

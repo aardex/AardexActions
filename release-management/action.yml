@@ -1,0 +1,100 @@
+name: AARDEX release management
+description: Deterministic human-approved GitHub source releases with native GITHUB_TOKEN
+inputs:
+  command:
+    description: 'Command: validate-pr, propose, resolve, or publish'
+    required: true
+  pr:
+    description: 'PR number; required except for propose'
+    required: false
+    default: ''
+  github-token:
+    description: 'Consumer native GITHUB_TOKEN'
+    required: false
+    default: '${{ github.token }}'
+  trunk-branch:
+    description: 'Consumer trunk branch'
+    required: false
+    default: 'main'
+  version-file:
+    description: 'Repository-relative version authority'
+    required: false
+    default: 'version.txt'
+  changelog-file:
+    description: 'Repository-relative changelog'
+    required: false
+    default: 'CHANGELOG.md'
+  candidate-file:
+    description: 'Repository-relative generated candidate metadata'
+    required: false
+    default: '.release/candidate.json'
+  baseline-file:
+    description: 'Repository-relative approved bootstrap boundary'
+    required: false
+    default: '.release/baseline.json'
+  managed-branch:
+    description: 'Stable in-repository candidate branch'
+    required: false
+    default: 'release/managed'
+  release-name:
+    description: 'Product/display name preceding the version'
+    required: false
+    default: 'Release'
+  tag-prefix:
+    description: 'Stable version tag prefix'
+    required: false
+    default: 'v'
+  immutability-confirmed:
+    description: 'Pass repository variable RELEASE_IMMUTABILITY_CONFIRMED; publish requires true'
+    required: false
+    default: 'false'
+outputs:
+  result:
+    description: 'validated, candidate, no-change, publication-pending, resolved, or published'
+    value: ${{ steps.engine.outputs.result }}
+  pr:
+    description: 'Validated/managed/resolved/published PR number'
+    value: ${{ steps.engine.outputs.pr }}
+  head-sha:
+    description: 'Validated or proposed exact PR head'
+    value: ${{ steps.engine.outputs.head_sha }}
+  version:
+    description: 'Proposed/published stable SemVer'
+    value: ${{ steps.engine.outputs.version }}
+  sha:
+    description: 'Resolved/published exact release merge SHA'
+    value: ${{ steps.engine.outputs.sha }}
+  tag:
+    description: 'Published tag'
+    value: ${{ steps.engine.outputs.tag }}
+  release-url:
+    description: 'Published GitHub Release URL'
+    value: ${{ steps.engine.outputs.release_url }}
+  immutable:
+    description: 'true only after verified publication readback'
+    value: ${{ steps.engine.outputs.immutable }}
+runs:
+  using: composite
+  steps:
+    - id: engine
+      shell: bash
+      env:
+        RELEASE_ACTION_PATH: ${{ github.action_path }}
+        RELEASE_COMMAND: ${{ inputs.command }}
+        RELEASE_PR: ${{ inputs.pr }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        RELEASE_TRUNK: ${{ inputs.trunk-branch }}
+        RELEASE_VERSION_FILE: ${{ inputs.version-file }}
+        RELEASE_CHANGELOG_FILE: ${{ inputs.changelog-file }}
+        RELEASE_CANDIDATE_FILE: ${{ inputs.candidate-file }}
+        RELEASE_BASELINE_FILE: ${{ inputs.baseline-file }}
+        RELEASE_BRANCH: ${{ inputs.managed-branch }}
+        RELEASE_PRODUCT: ${{ inputs.release-name }}
+        RELEASE_TAG_PREFIX: ${{ inputs.tag-prefix }}
+        RELEASE_IMMUTABILITY_CONFIRMED: ${{ inputs.immutability-confirmed }}
+      run: |
+        args=("$RELEASE_COMMAND")
+        if [[ -n "$RELEASE_PR" ]]; then
+          args+=(--pr "$RELEASE_PR")
+        fi
+        python3 -I "$RELEASE_ACTION_PATH/release.py" "${args[@]}"

@@ -1,6 +1,6 @@
 # Development and validation
 
-Work on a branch/worktree, inspect the action's `action.yml` and its README, and check all downstream `uses:` references before editing. No root project/solution/package manifest, automated unit-test suite, or general CI validation workflow is present here. `.github/workflows/example-copilot-pr-review.yml` only posts a PR comment on opened PRs. Do not treat a green PR comment job as validation of an action.
+Work on a branch/worktree, inspect the action's `action.yml` and its README, and check all downstream `uses:` references before editing. No root project/solution/package manifest or general CI validation workflow is present here. The [release-management capability](../release-management/README.md#maintainer-validation) has an isolated Python test suite and focused read-only CI; its safe local commands, disposable fixtures and CI-only dependencies are documented there. `.github/workflows/example-copilot-pr-review.yml` only posts a PR comment on opened PRs. Do not treat a green PR comment job as validation of an action.
 
 ## Tooling
 

@@ -1,0 +1,2 @@
+# Validation only; the action runtime and engine tests use Python stdlib.
+PyYAML==6.0.3
