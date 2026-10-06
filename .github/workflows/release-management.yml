@@ -1,0 +1,52 @@
+name: Release management CI
+on:
+  pull_request:
+    paths: [release-management/**, .github/workflows/release-management.yml, README.md, docs/development.md]
+  push:
+    branches: [main]
+    paths: [release-management/**, .github/workflows/release-management.yml, README.md, docs/development.md]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python: ['3.11', '3.12', '3.14']
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python3 -m unittest discover -s release-management/tests -v
+      - run: python3 -m compileall -q release-management
+      - run: python3 -m pip install -r release-management/requirements-ci.txt
+      - run: python3 release-management/check.py
+      - name: Validate focused workflows with pinned actionlint
+        env:
+          ACTIONLINT_TEMP: ${{ runner.temp }}/release-actionlint
+        run: |
+          mkdir -p "$ACTIONLINT_TEMP"
+          curl --fail --silent --show-error --location \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$ACTIONLINT_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' \
+            "$ACTIONLINT_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$ACTIONLINT_TEMP/actionlint.tar.gz" -C "$ACTIONLINT_TEMP" actionlint
+          "$ACTIONLINT_TEMP/actionlint" -shellcheck= \
+            .github/workflows/release-management.yml release-management/examples/*.yml
+      - name: Check patch whitespace
+        env:
+          CHECK_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          git diff --check
+          if [[ -n "$CHECK_BASE" && "$CHECK_BASE" != '0000000000000000000000000000000000000000' ]]; then
+            git diff --check "$CHECK_BASE" HEAD
+          else
+            git show --format= --check HEAD
+          fi

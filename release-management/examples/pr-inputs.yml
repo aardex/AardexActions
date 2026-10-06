@@ -1,0 +1,24 @@
+name: Validate release policy
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+jobs:
+  validate:
+    if: github.event.repository.default_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: aardex/AardexActions/release-management@REVIEWED_MERGED_SHA
+        with:
+          command: validate-pr
+          pr: ${{ github.event.pull_request.number }}

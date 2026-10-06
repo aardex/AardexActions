@@ -1,6 +1,6 @@
 # Deployment and release mechanics
 
-This repository distributes composite actions through Git refs (`aardex/AardexActions/<action>@<ref>`). It has no repository-wide publication/build workflow or deployment manifest. The only committed workflow is a PR-opened Copilot comment example. A consumer controls triggers, approvals, runner permissions and target environments; a `uses:` reference alone does not deploy anything. `@main` is mutable and internal calls to `@main` are not coupled to a caller's pinned ref. Verify all transitive action refs before adopting or releasing changes.
+This repository distributes composite actions through Git refs (`aardex/AardexActions/<action>@<ref>`). It has no repository-wide publication/build workflow or deployment manifest. Committed workflows include a PR-opened Copilot comment example and focused read-only release-management CI; neither publishes a release or deploys anything. A consumer controls triggers, approvals, runner permissions and target environments; a `uses:` reference alone does not deploy anything. `@main` is mutable and internal calls to `@main` are not coupled to a caller's pinned ref. Verify all transitive action refs before adopting or releasing changes.
 
 | Family | Observable behavior in `action.yml` |
 | --- | --- |
