@@ -6,32 +6,30 @@ Normal PR → merge to trunk → deterministic SemVer proposal → one managed R
 
 No artifact/package/image publication, Azure/ACR authentication, deployment, environment promotion, Terraform/IaC semantics, prerelease channels, arbitrary shell hooks, SBOM/provenance or EN-13 evidence is included. These remain separate delivery/governance concerns; EN-42 may inform a later version.
 
-## Extraction classification
+## Responsibility boundaries
 
-Behavioral reference: [Keycloak main at 951e17b5389d71fdd3e32a2d2dae946746b27cf7](https://github.com/aardex/keycloak/tree/951e17b5389d71fdd3e32a2d2dae946746b27cf7), inspected after EN-41 and before EN-42. The engine, tests, four workflows, baseline, candidate and release documentation were inspected.
-
-| Pilot capability | Classification / V1 handling |
+| Capability | Ownership / V1 handling |
 | --- | --- |
-| Conventional titles, stable SemVer/highest bump, first-parent merged-PR identity | Generic; fixed shared policy |
-| Deterministic notes/candidate, exactly three files, stable branch without force-push | Generic; shared engine |
-| Trusted validation, native bot identity, fresh exact-head statuses/approval | Generic; shared engine |
-| Human squash merge, exact SHA, fresh identities, immutable readback | Generic; shared engine |
-| Approved pending-publication deferral; partial/duplicate/conflict blockers | Generic; shared engine |
+| Conventional titles, stable SemVer/highest bump, first-parent merged-PR identity | Shared action; fixed release policy |
+| Deterministic notes/candidate, exactly three files, stable branch without force-push | Shared release engine |
+| Trusted validation, native bot identity, fresh exact-head statuses/approval | Shared release engine |
+| Human squash merge, exact SHA, fresh identities, immutable readback | Shared release engine |
+| Approved pending-publication deferral; partial/duplicate/conflict blockers | Shared release engine |
 | Trunk, four paths, managed branch, display name, tag prefix | Consumer configuration; small validated input surface |
-| Event triggers, concurrency, native-token permissions, checkout, branch/tag rules | Consumer configuration; three local wrappers and administrator settings |
-| Pilot tests and compilation | Generic fixtures extracted here; tested centrally in AardexActions CI |
-| Pilot documentation-link checker and product build tests | Consumer tooling; not privileged release hooks or shared required-status meanings |
-| Keycloak names, EN-40 bootstrap SHA/version, independent Terraform version | Keycloak-specific; no shared defaults/evidence copied |
-| JAR/theme/policy packaging, Dockerfile, manual operational image workflow | Keycloak-specific delivery; remain consumer-owned |
-| Azure/ACR, image locks/digests, rollout/rollback, SBOM/provenance, EN-13 | Later delivery/governance concern; excluded |
+| Event triggers, concurrency, native-token permissions, checkout, branch/tag rules | Consumer workflows and administrator settings |
+| Engine tests and compilation | AardexActions CI |
+| Product build tests and documentation checks | Consumer tooling; separate from shared required statuses |
+| Current version, bootstrap boundary and existing history | Consumer-owned release authority and evidence |
+| Artifact packaging and publication | Consumer delivery tooling; outside this action |
+| Azure/ACR, rollout/rollback, SBOM/provenance | Separate delivery/governance concerns |
 
-The pilot's follow-up document suggested reusable workflows and optional hooks. This extraction uses a composite action and no hooks: local triggers preserve event semantics, the shared script stays pinned outside the consumer checkout, and validation never runs consumer code. Publication reads the resolved merge as Git objects, eliminating the pilot's copied publisher and second checkout. Shared unit tests run in library CI; consumer statuses describe runtime policy/mechanics validation, not a repeated library suite or product build.
+The composite action keeps event triggers local and shared code pinned outside the consumer checkout. Validation never executes consumer code or arbitrary hooks. Publication reads the resolved merge as Git objects, so no copied publisher or second checkout is needed. Shared unit tests run in AardexActions CI; consumer statuses describe runtime policy/mechanics validation, not a repeated library suite or product build.
 
 ## Consumer prerequisites
 
 GitHub.com application/service repository; Linux GitHub-hosted runner with Git and Python 3.11+; reviewed trunk as the default branch; full trusted trunk checkout with `persist-credentials: false`; native `GITHUB_TOKEN`; Actions allowed to create PRs. No package install or external runtime service is required by the action. Origin must be the consumer's canonical HTTPS GitHub repository URL.
 
-Pin **every** wrapper to the full reviewed **merged AardexActions commit SHA**. `REVIEWED_MERGED_SHA` in the [examples](examples/pr-inputs.yml) is a deliberate placeholder: replace it after this implementation PR merges. Do not adopt a feature-branch SHA that squash merge may leave unreachable. Follow-up consumer migration is documented in [KEYCLOAK-MIGRATION.md](KEYCLOAK-MIGRATION.md).
+Pin **every** wrapper to the full reviewed **merged AardexActions commit SHA**. `REVIEWED_MERGED_SHA` in the [examples](examples/pr-inputs.yml) is a deliberate placeholder: replace it after this implementation PR merges. Do not adopt a feature-branch SHA that squash merge may leave unreachable.
 
 ## Inputs
 
