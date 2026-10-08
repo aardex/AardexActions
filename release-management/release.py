@@ -16,6 +16,7 @@ import urllib.request
 # Add only the pinned shared action directory, never the consumer checkout.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import manifest
+import gates
 
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z')
 TITLE = re.compile(r'(feat|fix|docs|chore|test|refactor|perf|build|ci|style|revert)(?:\(([a-zA-Z0-9_. /-]+)\))?(!)?: (\S[^\r\n]*)\Z')
@@ -40,8 +41,11 @@ class Config:
     branch: str = 'release/managed'
     product: str = 'Release'
     tag_prefix: str = 'v'
+    gate_policy_sha: str = ''
 
     def __post_init__(self):
+        require(not self.gate_policy_sha or bool(re.fullmatch(r'[0-9a-f]{40}', self.gate_policy_sha)),
+                'Gate policy pin must be an exact reviewed consumer commit SHA')
         paths = [self.version_file, self.changelog_file, self.candidate_file, self.baseline_file]
         for path in paths:
             parts = path.split('/')
@@ -282,6 +286,9 @@ def candidate(api, ref):
     date = git('show', '-s', '--format=%cs', ref)
     metadata = {'base_sha': ref, 'previous_version': current, 'version': next_version,
                 'date': date, 'changes': changes}
+    gate_snapshot = gates.snapshot(api, metadata, api.config.gate_policy_sha, sys.modules[__name__])
+    if gate_snapshot is not None:
+        metadata['gate_snapshot'] = gate_snapshot
     notes = f'## [{next_version}] {date}\n\n'
     for level, heading in [(3, 'Breaking changes'), (2, 'Features'), (1, 'Fixes'), (0, 'Other changes')]:
         entries = [c for c in changes if bump(c['title']) == level]
@@ -465,8 +472,11 @@ def publish(api, number):
     wanted, sha = preflight(api, number)
     v = wanted['metadata']['version']
     # Snapshot available evidence and validate before any publication mutation.
-    document = manifest.generate(api, wanted, sha)
+    evidence = gates.verify(api, wanted, api.config.gate_policy_sha, sys.modules[__name__])
+    document = manifest.generate(api, wanted, sha, gate_evidence=evidence)
     payload = json_text(document).encode('utf-8')
+    require(gates.verify(api, wanted, api.config.gate_policy_sha, sys.modules[__name__]) == evidence,
+            'Release gate evidence changed before tag creation')
     # POST creates only a fresh ref; no update/delete or duplicate recovery path.
     api.request('/git/refs', 'POST', {'ref': f'refs/tags/{api.config.tag_prefix}{v}', 'sha': sha})
     body = (wanted['notes'] + '\n### Release identity\n\n' +
@@ -487,6 +497,8 @@ def publish(api, number):
     source_tag = api.request(f'/git/ref/tags/{api.config.tag_prefix}{v}')
     require(source_tag['object']['type'] == 'commit' and source_tag['object']['sha'] == sha,
             'Draft release source tag mismatch; refusing publication')
+    require(gates.verify(api, wanted, api.config.gate_policy_sha, sys.modules[__name__]) == evidence,
+            'Release gate evidence changed before draft publication; reconcile partial publication manually')
     api.request(f'/releases/{record["id"]}', 'PATCH', {'draft': False})
     published = api.request(f'/releases/tags/{api.config.tag_prefix}{v}')
     tag = api.request(f'/git/ref/tags/{api.config.tag_prefix}{v}')

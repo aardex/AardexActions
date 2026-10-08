@@ -4,7 +4,7 @@ A small composite action replaces copied application/service release engines. Th
 
 Normal PR → merge to trunk → deterministic SemVer proposal → one managed Release PR → human approval of its exact final head → human squash merge → immutable version tag → immutable GitHub Release.
 
-Each new source release includes a validated `release-manifest.json` evidence snapshot. Artifact/package/image publication, Azure/ACR authentication, deployment, environment promotion, prerelease channels and arbitrary shell hooks remain outside this action. EN-43 business gates and EN-45 artifact promotion are not implemented. The manifest is neither deployment authorization nor a compliance/readiness attestation; the [release and documentation standard](https://github.com/aardex/AardexTechnicalDocumentation/blob/main/standards/release-and-documentation-standard.md) owns governance.
+Each new source release includes a validated `release-manifest.json` evidence snapshot. A small opt-in consumer policy enforces [deterministic source gates](deterministic-gates.md) before publication. Artifact/package/image publication, Azure/ACR authentication, deployment, environment promotion, prerelease channels and arbitrary shell hooks remain outside this action. EN-45 artifact promotion is not implemented. The manifest is neither deployment authorization nor a compliance/readiness attestation; the [release and documentation standard](https://github.com/aardex/AardexTechnicalDocumentation/blob/main/standards/release-and-documentation-standard.md) owns governance.
 
 ## Responsibility boundaries
 
@@ -22,6 +22,7 @@ Each new source release includes a validated `release-manifest.json` evidence sn
 | Current version, bootstrap boundary and existing history | Consumer-owned release authority and evidence |
 | Artifact packaging and publication | Consumer delivery tooling; outside this action |
 | Source identities, observed GitHub controls, manifest validation/upload/integrity | Shared publisher |
+| Explicit consumer gates and approval-bound source evidence | Consumer owns producers/policy; shared engine verifies pinned identities/results |
 | Artifact/migration/dependency/SBOM/provenance declarations | Optional consumer data; no verification of product bytes or external references |
 | Azure/ACR, rollout/rollback, SBOM/provenance generation | Separate delivery/governance concerns |
 
@@ -51,8 +52,9 @@ Pin **every** wrapper to the full reviewed **merged AardexActions commit SHA**. 
 | `tag-prefix` | `v` | Tag is `<prefix>X.Y.Z`; empty is allowed |
 | `immutability-confirmed` | `false` | For publish, pass `${{ vars.RELEASE_IMMUTABILITY_CONFIRMED }}`; must equal `true` |
 | `manifest-data` | Empty | Publish-only JSON containing any of `artifacts`, `migrations`, `dependencies`, `sbom`, `provenance`; at most 64 KiB, strict fields, no duplicate keys |
+| `gate-policy-sha` | Empty | Exact reviewed consumer trunk commit pinning only `.release/gates.json`; identical in all wrappers, required when the policy exists |
 
-Paths must be distinct repository-relative regular files using letters, digits, `_`, `.`, `/`, `-`; no absolute/traversal/empty segments, `.git*` segments (including workflow paths), option-like segments, overlapping paths, symlinks or executable blobs. Branch inputs are restricted valid Git branch names; managed branch differs from trunk. Tag prefixes use only letters, digits, `_`, `-`. No custom title types/bump mappings, candidate files, hooks or publication bypasses exist.
+Release-file paths must be distinct repository-relative regular files using letters, digits, `_`, `.`, `/`, `-`; no absolute/traversal/empty segments, `.git*` segments, option-like segments, overlapping paths, symlinks or executable blobs. The gate policy is also read as a regular non-executable blob. Gate workflow paths identify GitHub executions; their contents are not pinned or read by the engine. Branch inputs are restricted valid Git branch names; managed branch differs from trunk. Tag prefixes use only letters, digits, `_`, `-`. No custom title types/bump mappings, candidate files, hooks or publication bypasses exist.
 
 ## Outputs
 
@@ -80,6 +82,11 @@ Unset outputs are empty. Failure produces no success result.
 | Publish (merged PR or recovery dispatch) | `contents: write`, `pull-requests: read`, `statuses: read`, `checks: read`, `actions: read` |
 | Optional standalone resolve | `contents: read`, `pull-requests: read` |
 
+With a gate policy, proposal and managed Release PR validation additionally require
+`checks: read` and `actions: read`. Publication already has these EN-44 read
+permissions. The examples include these reads; no Actions/Workflows write,
+administration or credential override is needed.
+
 The action binds `GH_TOKEN` directly to `${{ github.token }}` from the consumer job. Native `GITHUB_TOKEN` is sufficient; the public interface exposes no credential override and consumers do not pass a token. PAT/GitHub App credentials are outside the V1 interface. The token is sent only to GitHub APIs and to Git fetch through a scoped child environment, never in command arguments, logs or persisted Git configuration. API diagnostics omit bodies/headers. No Administration, Actions/Workflows write, cloud, package or identity token permissions are needed. A fresh exact-SHA tag is created first; Release creation uses default trunk only as an unused creation hint. This avoids GitHub's Workflows-write check for recovery of an older source containing different workflows, which native `GITHUB_TOKEN` cannot satisfy. The tag and deterministic body, not a moving branch, prove release source identity. See [GitHub token permissions](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token).
 
 Privileged workflows checkout only trusted trunk. The action executes its own pinned `release.py` via isolated Python (`-I`) and imports manifest support only from its pinned action directory, so consumer modules cannot shadow the shared engine/stdlib. PR objects are fetched and inspected with Git as data; no PR checkout, installation, imports or shell execution occurs. Normal PRs cannot change version/history/candidate/baseline. Workflow/engine changes follow ordinary human-reviewed PRs. Pinning reviewed code is part of the trust boundary.
@@ -87,6 +94,17 @@ Privileged workflows checkout only trusted trunk. The action executes its own pi
 Managed PRs must be in-repository and created by `github-actions[bot]` with bot identity. The proposal appends commits to one stable branch using `force: false`, includes the previous head as a parent, and creates only the exact generated files. Byte comparisons preserve line endings and file modes. Candidate head/trunk are rechecked after validation. Auto-merge is forbidden. Publication requires latest non-comment approval from a human on the final head, a human merge, a one-parent squash commit on trunk's first-parent history, and the same reproducible tree as the approved head.
 
 ## Required statuses and rules
+
+[Deterministic release gates](deterministic-gates.md) describes the small opt-in
+consumer policy, exact source/run/job/App provenance, approval-bound candidate
+snapshot, pilot inventory and adoption limits. Configure `gate-policy-sha` with a
+reviewed consumer commit containing `.release/gates.json`; a present policy with
+no pin fails closed. Source gates run during candidate construction/reproduction
+and publication. Only policy bytes are pinned; normal producer workflow changes
+with unchanged policy need no repin. Valid identities/results do not certify job
+implementation quality: consumer CI changes require human PR review under GitHub
+protections (see the producer trust boundary and pilot gaps in that contract).
+Consumers retain their existing build/test ownership.
 
 - `release-inputs`: Conventional PR metadata and protected release files are valid. For the managed PR, bot/branch/repository identity, version/title and exact generated files reproduce.
 - `release-tests`: The pinned shared deterministic engine validated release policy/mechanics. Normal PRs pass policy/protected-file checks; managed PRs also pass full candidate reproduction and Git whitespace checks. Shared unit/AST/metadata/link checks run in AardexActions CI. This status never means the product build/test suite passed.
@@ -98,6 +116,12 @@ Administrator setup: require PRs, human reviews, both statuses (expected produce
 Enable **GitHub Release immutability**, then set the repository Actions **variable** `RELEASE_IMMUTABILITY_CONFIRMED=true`. No secret or GitHub Environment is needed. The variable authorizes the preflight only: the engine reads back `immutable=true`, non-draft/non-prerelease, exact tag SHA, release source hint and deterministic body after publication. See [immutable releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#immutable-releases) and [release API](https://docs.github.com/en/rest/releases/releases#create-a-release).
 
 ## Release manifest contract
+
+Gated consumers also retain optional `gate_evidence`, the exact source evidence
+frozen in the approved candidate plus approval time. The Schema v1 extension
+preserves old manifests and the original observed `checks`; validators using the
+old closed schema must update with the action. Gate evidence is generated by the
+engine and cannot be injected through `manifest-data`.
 
 [JSON Schema v1](release-manifest.schema.json) and [semantic validation](manifest.py) define the small, closed contract. [The complete synthetic example](examples/release-manifest.json) is schema-valid; its SHAs, run and URLs are fixtures, not hosted evidence. Unknown fields and malformed data fail publication. Runtime needs Python stdlib only; CI also checks the schema/example with a standard Draft 2020-12 validator.
 

@@ -1,0 +1,8 @@
+{
+  "workflows": [
+    {"path": ".github/workflows/consumer-checks.yml", "job": "consumer-checks"}
+  ],
+  "checks": [
+    {"name": "GitGuardian Security Checks", "app_id": 46505}
+  ]
+}
