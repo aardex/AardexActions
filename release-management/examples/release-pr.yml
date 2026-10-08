@@ -31,4 +31,5 @@ jobs:
       - uses: aardex/AardexActions/release-management@REVIEWED_MERGED_SHA
         with:
           command: propose
+          # Pins only .release/gates.json; unchanged policy allows CI evolution.
           # gate-policy-sha: REVIEWED_CONSUMER_POLICY_SHA

@@ -174,9 +174,9 @@ def snapshot(api, metadata, policy_sha, r, cutoff=None):
     require(policy_sha in r.git('rev-list', '--first-parent', source).splitlines(), 'policy pin is not on source trunk history')
     raw = r.read(policy_sha, POLICY_FILE)
     configured = policy(raw)
-    # Pin the policy and actual workflow bytes, not just human-readable check names.
-    for path in [POLICY_FILE, *(gate['path'] for gate in configured['workflows'])]:
-        require(r.read(source, path) == r.read(policy_sha, path), 'unapproved policy or producer change: ' + path)
+    # Pin only the gate policy. Producer implementations evolve through consumer
+    # PR review; attested execution identity/outcome does not certify their quality.
+    require(r.read(source, POLICY_FILE) == raw, 'unapproved policy change: ' + POLICY_FILE)
     cutoff = cutoff or now()
     source_time = datetime.fromtimestamp(int(r.git('show', '-s', '--format=%ct', source)), timezone.utc)
     evidence = [workflow_gate(api, gate, source, cutoff, source_time) for gate in configured['workflows']]

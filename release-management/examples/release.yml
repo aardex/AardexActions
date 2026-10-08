@@ -38,4 +38,5 @@ jobs:
           command: publish
           pr: ${{ github.event.pull_request.number || inputs.release_pr }}
           immutability-confirmed: ${{ vars.RELEASE_IMMUTABILITY_CONFIRMED }}
+          # Pins only .release/gates.json; unchanged policy allows CI evolution.
           # gate-policy-sha: REVIEWED_CONSUMER_POLICY_SHA

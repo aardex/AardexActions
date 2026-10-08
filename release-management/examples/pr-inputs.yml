@@ -26,4 +26,5 @@ jobs:
           pr: ${{ github.event.pull_request.number }}
           # After reviewed policy installation, pass its exact consumer commit
           # identically in all three wrappers (see deterministic-gates.md).
+          # Pins only .release/gates.json; unchanged policy allows CI evolution.
           # gate-policy-sha: REVIEWED_CONSUMER_POLICY_SHA

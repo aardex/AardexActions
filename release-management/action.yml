@@ -49,7 +49,7 @@ inputs:
     required: false
     default: ''
   gate-policy-sha:
-    description: 'Exact reviewed consumer trunk commit containing .release/gates.json and trusted producer workflows; required when the policy file exists'
+    description: 'Exact reviewed consumer trunk commit pinning only .release/gates.json; required when the policy file exists'
     required: false
     default: ''
 outputs:

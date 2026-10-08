@@ -20,7 +20,7 @@ class GatePublication(unittest.TestCase):
     release_pr = fixture.Fixture.release_pr
     merge_release = fixture.Fixture.merge_release
 
-    def prepare(self, pilot='keycloak'):
+    def prepare(self, pilot='keycloak', workflow_change=False):
         data = json.loads((Path(__file__).parent / 'fixtures' / (pilot + '.json')).read_text())
         self.api.repo = data['repository']
         self.api.config = r.Config(branch=data['branch'], product=data['product'])
@@ -36,6 +36,11 @@ class GatePublication(unittest.TestCase):
         Path('.release/gates.json').write_text(json.dumps(self.policy))
         policy_sha = self.change('chore(EN-43): install reviewed gate policy')
         self.api.config = replace(self.api.config, gate_policy_sha=policy_sha)
+        if workflow_change:
+            # Evolve CI implementation in the source commit, keeping the policy
+            # and workflow/job identity. No consumer code is executed here.
+            Path(self.policy['workflows'][0]['path']).write_text(
+                'name: consumer-checks\n# reviewed CI implementation evolved\n')
         self.source = self.change('fix(EN-43): pilot source')
         # Each included source PR has a different immutable head with equal tree.
         for p in self.api.prs:
@@ -120,8 +125,13 @@ class GatePublication(unittest.TestCase):
         self.runs['.github/workflows/terraform-validate.yml'][0]['conclusion'] = 'failure'
         self.assert_blocked()
 
-    def assert_valid_pilot(self, pilot):
-        self.prepare(pilot)
+    def assert_valid_pilot(self, pilot, workflow_change=False):
+        self.prepare(pilot, workflow_change)
+        if workflow_change:
+            pin = self.api.config.gate_policy_sha
+            self.assertEqual(r.read(pin, g.POLICY_FILE), r.read(self.source, g.POLICY_FILE))
+            path = self.policy['workflows'][0]['path']
+            self.assertNotEqual(r.read(pin, path), r.read(self.source, path))
         r.publish(self.api, self.p['number'])
         document = json.loads(self.api.manifest_payload)
         evidence = document['gate_evidence']
@@ -170,6 +180,12 @@ class GatePublication(unittest.TestCase):
 
     def test_terraform_required_gates_and_manifest_compatibility(self):
         self.assert_valid_pilot('terraform-runner')
+
+    def test_keycloak_workflow_change_without_policy_repin(self):
+        self.assert_valid_pilot('keycloak', workflow_change=True)
+
+    def test_terraform_workflow_change_without_policy_repin(self):
+        self.assert_valid_pilot('terraform-runner', workflow_change=True)
 
     def test_non_success_job_or_check_never_succeeds(self):
         self.prepare('terraform-runner')
@@ -306,12 +322,11 @@ class GatePublication(unittest.TestCase):
             self.assert_blocked()
         self.api.config = config
         original_read = r.read
-        for path in (g.POLICY_FILE, '.github/workflows/consumer-checks.yml'):
-            def read(sha, target):
-                raw = original_read(sha, target)
-                return raw + ' ' if sha == self.source and target == path else raw
-            with self.subTest(path=path), patch.object(r, 'read', side_effect=read):
-                self.assert_blocked()
+        def read(sha, target):
+            raw = original_read(sha, target)
+            return raw + ' ' if sha == self.source and target == g.POLICY_FILE else raw
+        with patch.object(r, 'read', side_effect=read):
+            self.assert_blocked()
         with self.assertRaises(ValueError):
             replace(config, gate_policy_sha='main')
 

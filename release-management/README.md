@@ -52,9 +52,9 @@ Pin **every** wrapper to the full reviewed **merged AardexActions commit SHA**. 
 | `tag-prefix` | `v` | Tag is `<prefix>X.Y.Z`; empty is allowed |
 | `immutability-confirmed` | `false` | For publish, pass `${{ vars.RELEASE_IMMUTABILITY_CONFIRMED }}`; must equal `true` |
 | `manifest-data` | Empty | Publish-only JSON containing any of `artifacts`, `migrations`, `dependencies`, `sbom`, `provenance`; at most 64 KiB, strict fields, no duplicate keys |
-| `gate-policy-sha` | Empty | Exact reviewed consumer trunk commit containing `.release/gates.json` and producer workflows; identical in all wrappers, required when the policy exists |
+| `gate-policy-sha` | Empty | Exact reviewed consumer trunk commit pinning only `.release/gates.json`; identical in all wrappers, required when the policy exists |
 
-Paths must be distinct repository-relative regular files using letters, digits, `_`, `.`, `/`, `-`; no absolute/traversal/empty segments, `.git*` segments (including workflow paths), option-like segments, overlapping paths, symlinks or executable blobs. Branch inputs are restricted valid Git branch names; managed branch differs from trunk. Tag prefixes use only letters, digits, `_`, `-`. No custom title types/bump mappings, candidate files, hooks or publication bypasses exist.
+Release-file paths must be distinct repository-relative regular files using letters, digits, `_`, `.`, `/`, `-`; no absolute/traversal/empty segments, `.git*` segments, option-like segments, overlapping paths, symlinks or executable blobs. The gate policy is also read as a regular non-executable blob. Gate workflow paths identify GitHub executions; their contents are not pinned or read by the engine. Branch inputs are restricted valid Git branch names; managed branch differs from trunk. Tag prefixes use only letters, digits, `_`, `-`. No custom title types/bump mappings, candidate files, hooks or publication bypasses exist.
 
 ## Outputs
 
@@ -100,7 +100,11 @@ consumer policy, exact source/run/job/App provenance, approval-bound candidate
 snapshot, pilot inventory and adoption limits. Configure `gate-policy-sha` with a
 reviewed consumer commit containing `.release/gates.json`; a present policy with
 no pin fails closed. Source gates run during candidate construction/reproduction
-and publication. Consumers retain their existing build/test ownership.
+and publication. Only policy bytes are pinned; normal producer workflow changes
+with unchanged policy need no repin. Valid identities/results do not certify job
+implementation quality: consumer CI changes require human PR review under GitHub
+protections (see the producer trust boundary and pilot gaps in that contract).
+Consumers retain their existing build/test ownership.
 
 - `release-inputs`: Conventional PR metadata and protected release files are valid. For the managed PR, bot/branch/repository identity, version/title and exact generated files reproduce.
 - `release-tests`: The pinned shared deterministic engine validated release policy/mechanics. Normal PRs pass policy/protected-file checks; managed PRs also pass full candidate reproduction and Git whitespace checks. Shared unit/AST/metadata/link checks run in AardexActions CI. This status never means the product build/test suite passed.

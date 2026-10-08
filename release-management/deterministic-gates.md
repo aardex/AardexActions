@@ -73,16 +73,19 @@ are unique, and unknown/duplicate fields fail. There are no expressions, optiona
 successes, hooks, profiles or orchestration.
 
 Pass `gate-policy-sha: <full reviewed consumer trunk commit SHA>` identically in
-all three wrappers. That commit contains the policy and trusted producer workflow
-bytes. It must be on the candidate source's first-parent trunk history. The policy
-and producer files at the source SHA must match that pin byte-for-byte and be
-regular non-executable blobs. Removing the input while the policy exists fails.
-Changing policy or producers without reviewed repinning fails. Removing the file
+all three wrappers. That commit pins **only the gate policy**, not producer workflow
+implementations. It must be on the candidate source's first-parent trunk history.
+The policy at the source SHA must match the pinned policy byte-for-byte and be a
+regular non-executable blob. Removing the input while the policy exists fails.
+Changing the policy without reviewed repinning fails. Removing the file
 while retaining its pin fails. A new pin changes generated candidate metadata,
 requiring a new final-head approval. Trusting a moving ref or policy supplied by
 an untrusted PR is unsupported. Trusted trunk wrappers and human governance of
 their pins are part of the existing release authority, as with the shared action
 pin; this action cannot protect against an administrator replacing the publisher.
+Normal producer workflow changes need no policy repin when the policy is unchanged.
+Renaming a required workflow path/job or changing an App identity requires a reviewed
+policy update and repin; a similarly named successful check cannot substitute.
 
 The relationships are deliberately distinct:
 
@@ -98,8 +101,10 @@ The relationships are deliberately distinct:
    job, and the job's attested `check_run_url`. Verify repository, event, branch,
    path, SHA, run/attempt, GitHub Actions App id `15368`, suite, timestamps and
    success on both job and check. PR jobs, dispatch runs and other branches do not
-   replace this gate. The reviewed producer must actually checkout its event SHA;
-   the supplied examples reuse the pilots' existing default checkout behavior.
+   replace this gate. Producer review must ensure it actually checks out its event
+   SHA and performs the intended validations. GitHub's run SHA attests the execution
+   identity; it does not prove which code a workflow checks out or tests. The supplied
+   examples reuse the pilots' existing default checkout behavior.
 3. Integrated source to approved Release PR and published merge: the existing
    engine permits only its generated version/changelog/candidate files, reproduces
    their exact bytes, requires final-head human approval and human squash merge,
@@ -122,6 +127,21 @@ all block. No filtering for successful runs or fallback to old results occurs.
 An arbitrary commit status cannot replace a workflow job or App check. A commit
 status's creator/target URL alone does not attest which workflow wrote it; mechanics
 are recomputed by the trusted engine instead of accepting self-declared success.
+
+### Producer implementation trust
+
+A developer could replace real tests with `run: true` while preserving the workflow
+path and job name. Once that change is integrated on trunk, a genuine successful
+GitHub Actions run can satisfy the technical gate. Workflow/job names, producer
+identity and success **do not certify test quality or coverage**. The engine neither
+pins workflow bytes nor evaluates their semantics. The approved evidence snapshot
+still binds the exact source and execution to the human Release PR approval; it
+does not replace review of CI implementation changes.
+
+Preventing this weakening belongs to ordinary consumer PR review and protected
+trunk governance, including the scripts, local actions and dependencies called by
+the workflows. It does not require a second approval system, another content hash
+or a version allowlist. Recommended GitHub controls and observed gaps are below.
 
 GitGuardian on the Release PR's own generated head remains an EN-44 observation,
 not a gate frozen into the content it scans (which would create a cycle). The
@@ -164,8 +184,8 @@ authorized changes. Reconcile with their open EN-44 PRs; do not mutate them here
    pre-EN-43 wrappers can validate this installation; no gate adoption is claimed
    until the next steps are complete. Review any candidate proposed in that window.
 2. Pin the merged shared action in all three wrappers. Pin the consumer commit
-   from step 1 as `gate-policy-sha` in all three calls, update the consumer pin/input
-   guards and documentation, and use only trusted trunk checkouts. Proposal and
+   containing the policy from step 1 as `gate-policy-sha` in all three calls, update
+   the consumer pin/input guards and documentation, and use only trusted trunk checkouts. Proposal and
    Release PR validation now need `checks: read` and `actions: read` in addition to
    existing permissions. Publication also needs EN-44's `statuses: read`,
    `checks: read`, `actions: read`. No administrative, cloud or token override
@@ -180,9 +200,12 @@ authorized changes. Reconcile with their open EN-44 PRs; do not mutate them here
    each pilot. Also prove a failed/missing gate blocks using a disposable consumer
    fixture, never a production release. No hosted release exercise was run here.
 
-For intentional policy/producer changes, review the new policy and workflow
-commit first, then repin through reviewed trusted wrappers. Until repinning,
-publication fails closed. For evidence changes before merge, regenerate the
+For both pilot examples, intentional policy changes require explicit policy review
+and a new `gate-policy-sha` in all trusted wrappers. Until repinning, publication
+fails closed. Producer workflow changes with unchanged policy follow normal CI PR
+review and need no policy repin. The new source still needs its own valid runs and
+approved snapshot; evidence from an earlier source cannot be reused. For evidence
+changes before merge, regenerate the
 candidate and obtain a new exact-head approval; do not edit candidate JSON
 manually. If evidence changes after the approved merge, that merged snapshot
 cannot be reapproved in place: the publisher blocks and a maintainer must review
@@ -220,9 +243,24 @@ already implemented deterministic PR obligation. Existing link/generated-referen
 checks are enforceable; AI cannot certify absence of impact. Cross-project and
 controlled-document implications retain review/QMS responsibility.
 
-Administrator decisions, when needed: approve consumer adoption, govern policy
-and publisher pins (optional CODEOWNERS review), confirm required-check producer
-integration ids and bypass policy, and resolve Snyk quota/security applicability.
+Read-only ruleset verification on 2026-10-08 confirms one required approving review
+and stale-review dismissal in both pilots, plus strict/up-to-date required checks.
+Neither pilot requires code-owner review or approval of the latest push; both PR
+review rulesets allow an always-bypass team. Terraform's separate required-check
+ruleset has no bypass; Keycloak's check rules share the bypassable PR ruleset.
+Required contexts have no explicit integration id. These controls do not guarantee
+specialist review of CI semantics, and bypass authority remains a trust boundary.
+
+Administrator decisions before relying on CI implementation quality: designate
+responsible owners for `.github/workflows/`, invoked validation scripts/local
+actions, `.release/gates.json`, publisher wrappers and `CODEOWNERS` itself, then
+require their reviews on protected trunk. A CODEOWNERS file alone is insufficient;
+the [GitHub code-owner review rule](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)
+must be enforced. Preserve stale-review dismissal, strict checks and protection
+against direct/force pushes; assess latest-push approval and restrict/audit bypass
+authority. Confirm expected check integration ids to reduce context spoofing; this
+does not prove the contents of a job. Review consumer adoption and policy/publisher
+pins, and resolve Snyk quota/security applicability through the responsible owners.
 Existing immutability confirmation and human controls remain. This patch makes no
 secret, rule, organization, identity, Azure, Terraform state or publisher changes.
 
@@ -235,5 +273,8 @@ code. Initial regressions reproduced publication with missing/failed gates befor
 the patch. Negative paths assert zero tag/draft mutations, while late changes
 assert that a partial draft stays unpublished. Existing mechanics, human approval,
 native-token, protected-file, manifest/upload and immutability regressions remain.
+Both pilot fixtures also prove that different workflow bytes with identical policy
+can publish using valid current-source evidence and the original policy pin; an
+unreviewed policy change still blocks before candidate or release mutation.
 Local and shared CI evidence must be reported separately from pilot adoption,
 live publication, product security and production approval.
