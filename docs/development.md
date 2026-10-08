@@ -4,6 +4,11 @@ Work on a branch/worktree, inspect the action's `action.yml` and its README, and
 
 ## Tooling
 
+For EN-43 source gates, see the release action's
+[policy, pilot inventory and safe validation boundary](../release-management/deterministic-gates.md).
+The shared suite uses only disposable Git fixtures and denied HTTP transport;
+consumer adoption and live release acceptance remain separate authorized work.
+
 Composite actions run in the caller's GitHub Actions job. Shell steps need Bash; Terraform actions use `hashicorp/setup-terraform@v3` (1.13.3 for deploy/destroy/format-validate), Azure actions use Azure CLI and/or Azure deployment actions, Docker publishing uses Buildx, .NET actions use `actions/setup-dotnet` (defaults vary by action), Java deployment uses Java 11 and Gradle 8.10 by default. Python steps use `actions/setup-python@v5` with `3.x`; only actions calling `scripts/azure/update-config.py` or Docker config setup install `scripts/requirements.txt` (`requests==2.32.4`). Consult the relevant manifest for exact runner dependencies, setup order and defaults. Consumer builds and tests belong to the consumer repository; there is nothing to `dotnet build` or `terraform init` at this repo root.
 
 For local, non-deploying checks on a proposed documentation/action change:

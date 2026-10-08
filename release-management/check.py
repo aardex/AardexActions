@@ -11,6 +11,7 @@ from urllib.parse import unquote
 import yaml
 from jsonschema import Draft202012Validator
 import manifest
+import gates
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -18,6 +19,8 @@ REPO = ROOT.parent
 
 def check():
     Draft202012Validator.check_schema(manifest.SCHEMA)
+    for path in ROOT.glob('examples/gates-*.json'):
+        gates.policy(path.read_text())
     example = json.loads((ROOT / 'examples/release-manifest.json').read_text())
     Draft202012Validator(manifest.SCHEMA).validate(example)
     manifest.validate(example, example['release']['repository'],
@@ -32,7 +35,7 @@ def check():
     assert set(inputs) == {
         'command', 'pr', 'trunk-branch', 'version-file', 'changelog-file',
         'candidate-file', 'baseline-file', 'managed-branch', 'release-name', 'tag-prefix',
-        'immutability-confirmed', 'manifest-data',
+        'immutability-confirmed', 'manifest-data', 'gate-policy-sha',
     }
     assert inputs['command']['required'] is True
     assert set(action['outputs']) == {'result', 'pr', 'head-sha', 'version', 'sha', 'tag', 'release-url', 'immutable'}

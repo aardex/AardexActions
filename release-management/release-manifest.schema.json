@@ -43,6 +43,29 @@
       }
     },
     "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "gate_evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_sha", "source_sha", "approved_at", "checks"],
+      "properties": {
+        "policy_sha": {"$ref": "#/$defs/sha"}, "source_sha": {"$ref": "#/$defs/sha"},
+        "approved_at": {"$ref": "#/$defs/text"},
+        "checks": {"type": "array", "minItems": 1, "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "name", "checked_sha", "source_sha", "id", "app_id", "reference", "run_id", "attempt", "workflow", "pr", "completed_at", "fingerprint"],
+          "properties": {
+            "kind": {"type": "string", "enum": ["workflow-job", "app-check"]}, "name": {"$ref": "#/$defs/text"},
+            "checked_sha": {"$ref": "#/$defs/sha"}, "source_sha": {"$ref": "#/$defs/sha"},
+            "id": {"$ref": "#/$defs/id"}, "app_id": {"$ref": "#/$defs/id"},
+            "reference": {"$ref": "#/$defs/reference"},
+            "run_id": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+            "attempt": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+            "workflow": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
+            "pr": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/id"}]},
+            "completed_at": {"$ref": "#/$defs/text"}, "fingerprint": {"$ref": "#/$defs/digest"}
+          }
+        }}
+      }
+    },
     "jira_keys": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+-[1-9][0-9]*$"}},
     "artifacts": {"anyOf": [{"$ref": "#/$defs/absent"}, {
       "type": "object", "additionalProperties": false, "required": ["state", "items"],

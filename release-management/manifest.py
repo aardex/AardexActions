@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
+import gates
 
 SCHEMA = json.loads(Path(__file__).with_name('release-manifest.schema.json').read_text())
 JIRA = re.compile(r'(?<![A-Za-z0-9_-])[A-Z][A-Z0-9]+-[1-9][0-9]*(?![A-Za-z0-9_-])')
@@ -81,6 +82,30 @@ def validate(document, repository, metadata, sha, head, tag_prefix):
     require(document['release_pr']['reference'] == f'https://github.com/{repository}/pull/{document["release_pr"]["number"]}',
             'Manifest Release PR reference mismatch')
     require(document['jira_keys'] == jira_keys(metadata['changes']), 'Manifest Jira keys mismatch')
+    require(('gate_evidence' in document) == ('gate_snapshot' in metadata), 'Manifest approved gate evidence missing or unexpected')
+    if 'gate_evidence' in document:
+        evidence = document['gate_evidence']
+        require({key: evidence[key] for key in ('policy_sha', 'source_sha', 'checks')} == metadata['gate_snapshot'],
+                'Manifest gate evidence differs from approved snapshot')
+        require(evidence['source_sha'] == metadata['base_sha'], 'Gate source identity mismatch')
+        cutoff = gates.timestamp(evidence['approved_at'])
+        included = {c['number']: c['sha'] for c in metadata['changes']}
+        for check in evidence['checks']:
+            require(check['reference'] == f'https://api.github.com/repos/{repository}/check-runs/{check["id"]}',
+                    'Gate reference mismatch')
+            require(gates.timestamp(check['completed_at']) <= cutoff, 'Gate evidence changed after approval')
+            if check['kind'] == 'workflow-job':
+                require(check['checked_sha'] == check['source_sha'] == metadata['base_sha']
+                        and check['app_id'] == gates.ACTIONS_APP and check['run_id'] is not None
+                        and check['attempt'] is not None and check['pr'] is None
+                        and isinstance(check['workflow'], str) and bool(re.fullmatch(
+                            r'\.github/workflows/[a-zA-Z0-9_-]+\.ya?ml', check['workflow'])),
+                        'Workflow gate evidence identity mismatch')
+            else:
+                require(check['run_id'] is None and check['attempt'] is None and check['workflow'] is None
+                        and check['app_id'] != gates.ACTIONS_APP, 'App gate evidence identity mismatch')
+                require(check['pr'] in included and check['source_sha'] == included[check['pr']],
+                        'Included PR gate source mismatch')
     generator = document['generator']
     require(generator['workflow_ref'].startswith(repository + '/.github/workflows/'), 'Generator workflow repository mismatch')
     require(generator['status'] != 'completed' and generator['conclusion'] is None,
@@ -169,7 +194,7 @@ def collect_checks(api, head, sha):
     return sorted(checks, key=lambda c: (c['checked_sha'], c['kind'], c['name'], c.get('id', 0)))
 
 
-def generate(api, wanted, sha):
+def generate(api, wanted, sha, gate_evidence=None):
     metadata, p = wanted['metadata'], wanted['release_pr']
     try:
         run_id, attempt = int(os.environ['GITHUB_RUN_ID']), int(os.environ['GITHUB_RUN_ATTEMPT'])
@@ -196,6 +221,8 @@ def generate(api, wanted, sha):
         'checks': collect_checks(api, p['head']['sha'], sha),
         **supplemental(os.environ.get('RELEASE_MANIFEST_DATA', '')),
     }
+    if gate_evidence is not None:
+        document['gate_evidence'] = gate_evidence
     validate(document, api.repo, metadata, sha, p['head']['sha'], api.config.tag_prefix)
     return document
 

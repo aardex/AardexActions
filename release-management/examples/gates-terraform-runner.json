@@ -1,0 +1,10 @@
+{
+  "workflows": [
+    {"path": ".github/workflows/consumer-checks.yml", "job": "consumer-checks"},
+    {"path": ".github/workflows/terraform-validate.yml", "job": "terraform-fmt"},
+    {"path": ".github/workflows/terraform-documentation.yml", "job": "terraform-docs"}
+  ],
+  "checks": [
+    {"name": "GitGuardian Security Checks", "app_id": 46505}
+  ]
+}
