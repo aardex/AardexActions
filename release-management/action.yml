@@ -44,6 +44,10 @@ inputs:
     description: 'Pass repository variable RELEASE_IMMUTABILITY_CONFIRMED; publish requires true'
     required: false
     default: 'false'
+  manifest-data:
+    description: 'Optional JSON sections: artifacts, migrations, dependencies, sbom, provenance. Declared data only, bound to the exact release SHA; no URLs fetched or hooks executed.'
+    required: false
+    default: ''
 outputs:
   result:
     description: 'validated, candidate, no-change, publication-pending, resolved, or published'
@@ -88,6 +92,7 @@ runs:
         RELEASE_PRODUCT: ${{ inputs.release-name }}
         RELEASE_TAG_PREFIX: ${{ inputs.tag-prefix }}
         RELEASE_IMMUTABILITY_CONFIRMED: ${{ inputs.immutability-confirmed }}
+        RELEASE_MANIFEST_DATA: ${{ inputs.manifest-data }}
       run: |
         args=("$RELEASE_COMMAND")
         if [[ -n "$RELEASE_PR" ]]; then

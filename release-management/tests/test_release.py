@@ -1,5 +1,6 @@
 """Only disposable local Git repositories and in-memory APIs; no credentials/network."""
 import json
+import hashlib
 import io
 import os
 from contextlib import redirect_stdout
@@ -31,18 +32,39 @@ class FakeGitHub:
         self.mutations = []
         self.trees = {}
         self.immutable = True
+        self.assets = {}
+        self.manifest_payload = None
 
-    def pages(self, path):
+    def pages(self, path, key=None):
         if path.endswith('/reviews'):
             p = self.pr(int(path.split('/')[2]))
             return [{'state': 'APPROVED', 'commit_id': p['head']['sha'],
                      'user': {'login': 'reviewer', 'type': 'User'}}]
+        if path.endswith('/statuses'):
+            sha = path.split('/')[2]
+            return [{'id': i + 1, 'state': state, 'context': context}
+                    for i, (target, state, context) in enumerate(self.statuses) if target == sha]
+        if '/check-runs?' in path:
+            assert key == 'check_runs'
+            return []
+        if path.startswith('/releases/') and path.endswith('/assets'):
+            return list(self.assets.values())
         if path.startswith('/commits/'):
             sha = path.split('/')[2]
             return [p for p in self.prs if p.get('merge_commit_sha') == sha]
         if path.startswith('/pulls?'):
             return [p for p in self.prs if not p['merged']]
         raise AssertionError(path)
+
+    def upload_manifest(self, release_id, payload):
+        assert self.records[next(iter(self.records))]['draft'] is True
+        assert not self.assets
+        self.manifest_payload = payload
+        asset = {'id': 10, 'name': 'release-manifest.json', 'state': 'uploaded',
+                 'size': len(payload), 'digest': 'sha256:' + hashlib.sha256(payload).hexdigest()}
+        self.assets[10] = asset
+        self.mutations.append(('upload-manifest', 'POST', None))
+        return asset
 
     def pr(self, number):
         return next(p for p in self.prs if p['number'] == number)
@@ -55,6 +77,12 @@ class FakeGitHub:
             self.mutations.append((path, method, data))
         if path == '':
             return {'default_branch': self.config.trunk}
+        if path == '/actions/runs/100/attempts/1':
+            return {'id': 100, 'run_attempt': 1, 'head_sha': r.git('rev-parse', self.config.trunk),
+                    'path': '.github/workflows/release.yml',
+                    'repository': {'full_name': self.repo}, 'status': 'in_progress', 'conclusion': None}
+        if path.startswith('/releases/assets/'):
+            return self.assets[int(path.rsplit('/', 1)[1])]
         if path == '/branches/' + r.quote(self.config.trunk, safe=''):
             return {'commit': {'sha': r.git('rev-parse', self.config.trunk)}}
         if path.startswith('/git/ref/tags/'):
@@ -133,10 +161,15 @@ class Fixture(unittest.TestCase):
         self.network = patch.object(r.urllib.request, 'urlopen', side_effect=AssertionError('Network forbidden in fixture'))
         self.network.start()
         self.addCleanup(self.network.stop)
+        self.opener = patch.object(r.urllib.request.OpenerDirector, 'open', side_effect=AssertionError('Network forbidden in fixture'))
+        self.opener.start()
+        self.addCleanup(self.opener.stop)
         clean_env = {k: v for k, v in os.environ.items() if k not in
                      ('GH_TOKEN', 'GITHUB_TOKEN', 'GITHUB_OUTPUT') and not k.startswith('RELEASE_')}
         clean_env.update(RELEASE_IMMUTABILITY_CONFIRMED='true', GIT_CONFIG_GLOBAL='/dev/null',
-                         GIT_CONFIG_NOSYSTEM='1')
+                         GIT_CONFIG_NOSYSTEM='1', GITHUB_RUN_ID='100', GITHUB_RUN_ATTEMPT='1',
+                         GITHUB_WORKFLOW_REF='example/service/.github/workflows/release.yml@refs/heads/main',
+                         GITHUB_WORKFLOW_SHA='a' * 40)
         self.env = patch.dict(os.environ, clean_env, clear=True)
         self.env.start()
         self.temp = tempfile.TemporaryDirectory()
@@ -185,7 +218,7 @@ class Fixture(unittest.TestCase):
             Path(path).write_text(r.read(r.git('rev-parse', self.api.config.branch), path))
         cmd('git', 'add', *sorted(self.api.config.files))
         tree = r.git('write-tree')
-        sha = cmd('git', 'commit-tree', tree, '-p', base, data=p['title'])
+        sha = cmd('git', 'commit-tree', tree, '-p', base, data=p['title'] + '\n\nHuman squash merge')
         cmd('git', 'reset', '--hard', sha)
         p.update(merged=True, merged_at='2026-10-05T11:00:00Z', merge_commit_sha=sha,
                  merged_by={'type': 'User'})
@@ -458,7 +491,10 @@ class Fixture(unittest.TestCase):
         p, sha = self.merge_release()
         # No Azure configuration or evidence file exists in this fixture.
         with patch.dict(os.environ, {}, clear=True):
-            with patch.dict(os.environ, {'RELEASE_IMMUTABILITY_CONFIRMED': 'true'}):
+            with patch.dict(os.environ, {'RELEASE_IMMUTABILITY_CONFIRMED': 'true',
+                    'GITHUB_RUN_ID': '100', 'GITHUB_RUN_ATTEMPT': '1',
+                    'GITHUB_WORKFLOW_REF': 'example/service/.github/workflows/release.yml@refs/heads/main',
+                    'GITHUB_WORKFLOW_SHA': 'a' * 40}):
                 r.publish(self.api, p['number'])
         self.assertEqual(sha, self.api.tags['v1.0.1']['object']['sha'])
         record = self.api.records['v1.0.1']
@@ -830,7 +866,7 @@ class Configuration(unittest.TestCase):
             errors = [r.urllib.error.HTTPError(api.root, 403, 'fixture-secret-value', {}, None),
                       r.urllib.error.URLError('fixture-secret-value')]
             for error in errors:
-                with patch.object(r.urllib.request, 'urlopen', side_effect=error):
+                with patch.object(r.urllib.request.OpenerDirector, 'open', side_effect=error):
                     with self.assertRaises(RuntimeError) as caught:
                         api.request('/pulls/99')
                     self.assertNotIn(env['GH_TOKEN'], str(caught.exception))

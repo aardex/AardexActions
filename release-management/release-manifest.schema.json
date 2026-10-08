@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aardex/AardexActions/release-management/release-manifest.schema.json",
+  "title": "Source Release Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "release", "release_pr", "changes", "generator", "checks", "jira_keys", "artifacts", "migrations", "dependencies", "sbom", "provenance"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "release": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "repository", "version", "tag", "sha"],
+      "properties": {
+        "kind": {"const": "source"},
+        "repository": {"type": "string", "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+        "tag": {"$ref": "#/$defs/text"}, "sha": {"$ref": "#/$defs/sha"}
+      }
+    },
+    "release_pr": {
+      "type": "object", "additionalProperties": false,
+      "required": ["number", "reference", "head_sha", "merge_sha", "tree_match"],
+      "properties": {
+        "number": {"$ref": "#/$defs/id"}, "reference": {"$ref": "#/$defs/reference"},
+        "head_sha": {"$ref": "#/$defs/sha"}, "merge_sha": {"$ref": "#/$defs/sha"}, "tree_match": {"const": true}
+      }
+    },
+    "changes": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["number", "title", "sha"],
+        "properties": {"number": {"$ref": "#/$defs/id"}, "title": {"$ref": "#/$defs/text"}, "sha": {"$ref": "#/$defs/sha"}}
+      }
+    },
+    "generator": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "attempt", "workflow_ref", "workflow_sha", "run_head_sha", "reference", "status", "conclusion"],
+      "properties": {
+        "run_id": {"$ref": "#/$defs/id"}, "attempt": {"$ref": "#/$defs/id"},
+        "workflow_ref": {"type": "string", "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/\\.github/workflows/[^@ ]+@[^ ]+$"},
+        "workflow_sha": {"$ref": "#/$defs/sha"}, "run_head_sha": {"$ref": "#/$defs/sha"},
+        "reference": {"$ref": "#/$defs/reference"}, "status": {"$ref": "#/$defs/status"}, "conclusion": {"const": null}
+      }
+    },
+    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "jira_keys": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9]+-[1-9][0-9]*$"}},
+    "artifacts": {"anyOf": [{"$ref": "#/$defs/absent"}, {
+      "type": "object", "additionalProperties": false, "required": ["state", "items"],
+      "properties": {"state": {"const": "available"}, "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}}}
+    }]},
+    "migrations": {"$ref": "#/$defs/references"},
+    "dependencies": {"anyOf": [{"$ref": "#/$defs/absent"}, {
+      "type": "object", "additionalProperties": false, "required": ["state", "items"],
+      "properties": {"state": {"const": "available"}, "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/dependency"}}}
+    }]},
+    "sbom": {"$ref": "#/$defs/references"}, "provenance": {"$ref": "#/$defs/references"}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^[^\\u0000-\\u001f\\u007f]+$"},
+    "reference": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^\\S+$"},
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "id": {"type": "integer", "minimum": 1},
+    "status": {"type": "string", "enum": ["queued", "in_progress", "completed", "waiting", "pending", "requested"]},
+    "outcome": {
+      "type": "object", "additionalProperties": false, "required": ["status", "conclusion"],
+      "properties": {
+        "status": {"type": "string", "enum": ["success", "failure", "error", "pending", "queued", "in_progress", "completed", "waiting", "requested"]},
+        "conclusion": {"anyOf": [{"type": "null"}, {"type": "string", "enum": ["success", "failure", "neutral", "cancelled", "skipped", "timed_out", "action_required", "stale", "startup_failure"]}]}
+      }
+    },
+    "absent": {
+      "type": "object", "additionalProperties": false, "required": ["state", "reason"],
+      "properties": {"state": {"type": "string", "enum": ["missing", "not_applicable"]}, "reason": {"$ref": "#/$defs/text"}}
+    },
+    "check": {"anyOf": [{
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "kind", "name", "id", "checked_sha", "verification", "reference", "outcome"],
+      "properties": {
+        "state": {"const": "available"}, "kind": {"type": "string", "enum": ["release-mechanics", "github-status", "github-check"]},
+        "name": {"$ref": "#/$defs/text"}, "checked_sha": {"$ref": "#/$defs/sha"}, "verification": {"const": "observed"},
+        "id": {"$ref": "#/$defs/id"},
+        "reference": {"$ref": "#/$defs/reference"}, "outcome": {"$ref": "#/$defs/outcome"}
+      }
+    }, {
+      "type": "object", "additionalProperties": false, "required": ["state", "kind", "name", "checked_sha", "reason"],
+      "properties": {
+        "state": {"type": "string", "enum": ["missing", "not_applicable"]},
+        "kind": {"type": "string", "enum": ["release-mechanics", "github-status", "github-check"]},
+        "name": {"$ref": "#/$defs/text"}, "checked_sha": {"$ref": "#/$defs/sha"}, "reason": {"$ref": "#/$defs/text"}
+      }
+    }]},
+    "artifact": {
+      "type": "object", "additionalProperties": false, "required": ["type", "reference", "digest", "release_sha", "verification"],
+      "properties": {
+        "type": {"type": "string", "enum": ["container", "package", "binary", "archive"]},
+        "reference": {"$ref": "#/$defs/reference"}, "digest": {"$ref": "#/$defs/digest"},
+        "release_sha": {"$ref": "#/$defs/sha"}, "verification": {"const": "declared"}
+      }
+    },
+    "references": {"anyOf": [{"$ref": "#/$defs/absent"}, {
+      "type": "object", "additionalProperties": false, "required": ["state", "items"],
+      "properties": {"state": {"const": "available"}, "items": {
+        "type": "array", "minItems": 1, "items": {
+          "type": "object", "additionalProperties": false, "required": ["reference", "release_sha", "verification"],
+          "properties": {"reference": {"$ref": "#/$defs/reference"}, "release_sha": {"$ref": "#/$defs/sha"}, "verification": {"const": "declared"}}
+        }
+      }}
+    }]},
+    "dependency": {
+      "type": "object", "additionalProperties": false, "required": ["type", "reference", "declared_ref", "resolved", "release_sha", "verification"],
+      "properties": {
+        "type": {"type": "string", "enum": ["infrastructure", "module", "provider"]},
+        "reference": {"$ref": "#/$defs/reference"}, "declared_ref": {"$ref": "#/$defs/text"},
+        "resolved": {"anyOf": [{"type": "null"}, {
+          "type": "object", "additionalProperties": false, "required": ["kind", "value"],
+          "properties": {"kind": {"type": "string", "enum": ["git_commit", "version", "digest"]}, "value": {"$ref": "#/$defs/text"}}
+        }]},
+        "release_sha": {"$ref": "#/$defs/sha"}, "verification": {"const": "declared"}
+      }
+    }
+  }
+}
