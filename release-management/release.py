@@ -4,6 +4,7 @@ import argparse
 import base64
 import json
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 import re
@@ -11,6 +12,10 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+
+# Add only the pinned shared action directory, never the consumer checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import manifest
 
 VERSION = re.compile(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z')
 TITLE = re.compile(r'(feat|fix|docs|chore|test|refactor|perf|build|ci|style|revert)(?:\(([a-zA-Z0-9_. /-]+)\))?(!)?: (\S[^\r\n]*)\Z')
@@ -149,6 +154,12 @@ def json_text(value):
     return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + '\n'
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        # Authenticated JSON/upload calls must never forward credentials.
+        return None
+
+
 class GitHub:
     def __init__(self, config=None):
         self.config = config or Config()
@@ -159,15 +170,23 @@ class GitHub:
         require(bool(self.token), 'Native GITHUB_TOKEN is required')
 
     def request(self, path, method='GET', data=None, missing=False):
+        require(path == '' or (path.startswith('/') and not path.startswith('//')), 'Invalid GitHub API path')
         url = self.root + path
         payload = json.dumps(data).encode() if data is not None else None
+        return self.json_request(url, method, payload, missing=missing)
+
+    def json_request(self, url, method, payload=None, missing=False, content_type='application/json'):
+        # URLs are constructed by this engine; never use input/API upload_url.
+        require(url == self.root or url.startswith(self.root + '/') or bool(re.fullmatch(
+            re.escape(f'https://uploads.github.com/repos/{self.repo}/releases/') +
+            r'[1-9][0-9]*/assets\?name=release-manifest\.json', url)), 'Untrusted authenticated URL')
         req = urllib.request.Request(url, data=payload, method=method, headers={
             'Authorization': f'Bearer {self.token}', 'Accept': 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json',
+            'Content-Type': content_type,
         })
         try:
-            with urllib.request.urlopen(req, timeout=60) as response:
+            with urllib.request.build_opener(NoRedirect()).open(req, timeout=60) as response:
                 body = response.read()
                 return json.loads(body) if body else None
         except urllib.error.HTTPError as error:
@@ -178,14 +197,21 @@ class GitHub:
         except (urllib.error.URLError, TimeoutError):
             raise RuntimeError('GitHub request failed; check connectivity and retry safely') from None
 
-    def pages(self, path):
+    def pages(self, path, key=None):
         result = []
         for page in range(1, 1001):
             rows = self.request(f'{path}{"&" if "?" in path else "?"}per_page=100&page={page}')
+            if key is not None:
+                rows = rows[key]
             result.extend(rows)
             if len(rows) < 100:
                 return result
         raise ValueError('GitHub pagination limit reached')
+
+    def upload_manifest(self, release_id, payload):
+        require(type(release_id) is int and release_id > 0, 'Invalid draft release id')
+        url = f'https://uploads.github.com/repos/{self.repo}/releases/{release_id}/assets?name=release-manifest.json'
+        return self.json_request(url, 'POST', payload, content_type='application/json')
 
     def pr(self, number):
         return self.request(f'/pulls/{int(number)}')
@@ -432,12 +458,15 @@ def preflight(api, number):
     v = wanted['metadata']['version']
     require(api.request(f'/git/ref/tags/{api.config.tag_prefix}{v}', missing=True) is None, 'Duplicate Git tag; refusing publication')
     require(api.request(f'/releases/tags/{api.config.tag_prefix}{v}', missing=True) is None, 'Duplicate GitHub Release; refusing publication')
-    return wanted, sha
+    return dict(wanted, release_pr=p), sha
 
 
 def publish(api, number):
     wanted, sha = preflight(api, number)
     v = wanted['metadata']['version']
+    # Snapshot available evidence and validate before any publication mutation.
+    document = manifest.generate(api, wanted, sha)
+    payload = json_text(document).encode('utf-8')
     # POST creates only a fresh ref; no update/delete or duplicate recovery path.
     api.request('/git/refs', 'POST', {'ref': f'refs/tags/{api.config.tag_prefix}{v}', 'sha': sha})
     body = (wanted['notes'] + '\n### Release identity\n\n' +
@@ -448,6 +477,16 @@ def publish(api, number):
     # (that permission cannot be granted to native GITHUB_TOKEN).
     record = api.request('/releases', 'POST', {'tag_name': f'{api.config.tag_prefix}{v}', 'target_commitish': api.config.trunk,
                 'name': f'{api.config.product} {v}', 'body': body, 'draft': True, 'prerelease': False})
+    require(record.get('draft') is True and record.get('tag_name') == api.config.tag_prefix + v,
+            'Created release must be the expected draft')
+    release_id = record['id']
+    require(type(release_id) is int and release_id > 0, 'Invalid draft release id')
+    require(not api.pages(f'/releases/{release_id}/assets'), 'Draft already contains assets; refusing overwrite')
+    asset = api.upload_manifest(release_id, payload)
+    manifest.verify_asset(api, release_id, payload, asset['id'])
+    source_tag = api.request(f'/git/ref/tags/{api.config.tag_prefix}{v}')
+    require(source_tag['object']['type'] == 'commit' and source_tag['object']['sha'] == sha,
+            'Draft release source tag mismatch; refusing publication')
     api.request(f'/releases/{record["id"]}', 'PATCH', {'draft': False})
     published = api.request(f'/releases/tags/{api.config.tag_prefix}{v}')
     tag = api.request(f'/git/ref/tags/{api.config.tag_prefix}{v}')
@@ -458,6 +497,8 @@ def publish(api, number):
             and published.get('name') == f'{api.config.product} {v}'
             and published.get('body') == body and tag['object']['type'] == 'commit'
             and tag['object']['sha'] == sha, 'Published release identity/source/notes mismatch')
+    require(published['id'] == release_id, 'Published release id mismatch')
+    manifest.verify_asset(api, release_id, payload, asset['id'])
     outputs(result='published', pr=number, sha=sha, version=v, tag=api.config.tag_prefix + v,
             release_url=published['html_url'], immutable='true')
     print(f'Published {published["html_url"]}: {sha} -> {api.config.tag_prefix}{v} -> immutable GitHub Release')

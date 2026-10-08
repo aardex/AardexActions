@@ -23,9 +23,9 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python }}
+      - run: python3 -m pip install -r release-management/requirements-ci.txt
       - run: python3 -m unittest discover -s release-management/tests -v
       - run: python3 -m compileall -q release-management
-      - run: python3 -m pip install -r release-management/requirements-ci.txt
       - run: python3 release-management/check.py
       - name: Validate focused workflows with pinned actionlint
         env:

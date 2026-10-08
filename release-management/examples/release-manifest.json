@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "release": {
+    "kind": "source",
+    "repository": "example/service",
+    "version": "1.0.1",
+    "tag": "v1.0.1",
+    "sha": "1111111111111111111111111111111111111111"
+  },
+  "release_pr": {
+    "number": 12,
+    "reference": "https://github.com/example/service/pull/12",
+    "head_sha": "2222222222222222222222222222222222222222",
+    "merge_sha": "1111111111111111111111111111111111111111",
+    "tree_match": true
+  },
+  "changes": [
+    {"number": 11, "title": "fix(EN-44): synthetic correction", "sha": "3333333333333333333333333333333333333333"}
+  ],
+  "generator": {
+    "run_id": 100,
+    "attempt": 1,
+    "workflow_ref": "example/service/.github/workflows/release.yml@refs/heads/main",
+    "workflow_sha": "4444444444444444444444444444444444444444",
+    "run_head_sha": "5555555555555555555555555555555555555555",
+    "reference": "https://github.com/example/service/actions/runs/100/attempts/1",
+    "status": "in_progress",
+    "conclusion": null
+  },
+  "checks": [
+    {
+      "state": "available", "kind": "release-mechanics", "name": "release-tests", "id": 200,
+      "checked_sha": "2222222222222222222222222222222222222222", "verification": "observed",
+      "reference": "https://api.github.com/repos/example/service/commits/2222222222222222222222222222222222222222/statuses",
+      "outcome": {"status": "success", "conclusion": null}
+    },
+    {
+      "state": "missing", "kind": "github-check", "name": "Check runs",
+      "checked_sha": "1111111111111111111111111111111111111111",
+      "reason": "No check runs collected on this SHA"
+    }
+  ],
+  "jira_keys": ["EN-44"],
+  "artifacts": {"state": "missing", "reason": "No product artifact identity collected"},
+  "migrations": {"state": "not_applicable", "reason": "Synthetic source correction has no database migration"},
+  "dependencies": {"state": "missing", "reason": "No resolved dependency inventory collected"},
+  "sbom": {"state": "missing", "reason": "No SBOM supplied"},
+  "provenance": {"state": "missing", "reason": "No product provenance supplied"}
+}

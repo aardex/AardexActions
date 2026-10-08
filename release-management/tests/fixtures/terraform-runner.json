@@ -1,0 +1,20 @@
+{
+  "description": "Synthetic IaC source pilot; no init, plan, apply or image publication",
+  "repository": "aardex/TerraformGithubRunner",
+  "branch": "release/terraform-github-runner",
+  "product": "TerraformGithubRunner",
+  "title": "fix(EN-44): synthetic module correction EN-13",
+  "manifest_data": {
+    "artifacts": {"state": "missing", "reason": "Runner image pipeline supplied no artifact identity"},
+    "migrations": {"state": "not_applicable", "reason": "Synthetic IaC-only release has no database migration"},
+    "dependencies": {
+      "state": "available",
+      "items": [
+        {"type": "module", "reference": "https://github.com/aardex/TerraformModules", "declared_ref": "main", "resolved": null, "release_sha": "$RELEASE_SHA", "verification": "declared"},
+        {"type": "provider", "reference": "registry.terraform.io/hashicorp/azurerm", "declared_ref": "~> 4.60.0", "resolved": null, "release_sha": "$RELEASE_SHA", "verification": "declared"}
+      ]
+    },
+    "sbom": {"state": "missing", "reason": "No SBOM supplied"},
+    "provenance": {"state": "missing", "reason": "No provenance supplied"}
+  }
+}

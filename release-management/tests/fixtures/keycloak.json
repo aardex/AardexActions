@@ -1,0 +1,14 @@
+{
+  "description": "Synthetic source-only application pilot; not hosted execution evidence",
+  "repository": "aardex/keycloak",
+  "branch": "release/keycloak",
+  "product": "Keycloak",
+  "title": "fix(EN-44): synthetic theme correction EN-13 EN-44",
+  "manifest_data": {
+    "artifacts": {"state": "missing", "reason": "Independent image publisher supplied no image digest"},
+    "migrations": {"state": "not_applicable", "reason": "Synthetic theme-only change has no database migration"},
+    "dependencies": {"state": "missing", "reason": "No resolved infrastructure inventory collected"},
+    "sbom": {"state": "missing", "reason": "No SBOM supplied"},
+    "provenance": {"state": "missing", "reason": "No product provenance supplied"}
+  }
+}
