@@ -121,23 +121,6 @@ runs:
 
         "${CMD[@]}" > result.txt 2>&1
 
-    - name: Terraform Show
-      if: always()
-      shell: bash
-      working-directory: ${{ inputs.directory }}
-      run: terraform show -json tfplan.tfplan > tfplan.json
-
-    - name: Upload Plan Artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: tfplan
-        path: |
-          ${{ inputs.directory }}/tfplan.tfplan
-          ${{ inputs.directory }}/tfplan.json
-          ${{ inputs.directory }}/result.txt
-        retention-days: 15
-
     - name: Terraform Apply (opt-in)
       if: ${{ inputs.apply == 'true' }}
       shell: bash
