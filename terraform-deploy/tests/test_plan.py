@@ -17,8 +17,8 @@ def run_block(name):
     step = MANIFEST.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
     run = step.split('      run: ', 1)[1]
     if run.startswith('|\n'):
-        return textwrap.dedent(run[2:]).rstrip() + '\n'
-    return run.splitlines()[0] + '\n'
+        return textwrap.dedent(run[2:]).replace('${{ github.action_path }}', '$ACTION_PATH').rstrip() + '\n'
+    return run.splitlines()[0].replace('${{ github.action_path }}', '$ACTION_PATH') + '\n'
 
 
 class PlanTests(unittest.TestCase):
@@ -32,11 +32,13 @@ class PlanTests(unittest.TestCase):
         self.payload = self.root / 'payload'
         self.env = dict(os.environ, PATH=str(self.root / 'bin') + os.pathsep + os.environ['PATH'],
                         GITHUB_STEP_SUMMARY=str(self.summary), RUNNER_TEMP=str(self.root),
-                        CALLS=str(self.calls), PAYLOAD=str(self.payload), PLAN_ARGS='', PLAN_OUTCOME='success')
+                        CALLS=str(self.calls), PAYLOAD=str(self.payload), PLAN_ARGS='', PLAN_OUTCOME='success',
+                        ACTION_PATH=str(ACTION))
         mock = self.root / 'bin/terraform'
         mock.write_text('''#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$CALLS"
 case "$1" in
+  init|validate) echo "$1-SECRET"; printf '%s\n' '::error::STDERR-SECRET' 'https://secret.example/token' >&2; exit "${STAGE_EXIT:-0}" ;;
   plan) echo 'PLAN-SECRET'; if [[ ${PLAN_FAIL:-0} == 1 ]]; then exit 7; fi; touch tfplan.tfplan ;;
   show) cat "$PAYLOAD"; echo 'SHOW-SECRET' >&2; exit "${SHOW_EXIT:-0}" ;;
   apply) echo 'APPLY-SECRET'; exit "${APPLY_EXIT:-0}" ;;
@@ -97,6 +99,54 @@ esac
             self.assertIn('could not be summarized', self.summary.read_text())
             self.assertNotIn('SECRET', self.summary.read_text() + result.stdout + result.stderr)
 
+    def test_failures_expose_only_fixed_stage_and_numeric_status(self):
+        cases = [
+            ('Terraform Init', 'init', {'STAGE_EXIT': '13'}, 13),
+            ('Terraform Validate', 'validate', {'STAGE_EXIT': '13'}, 13),
+            ('Terraform Plan', 'plan', {'PLAN_FAIL': '1'}, 7),
+            ('Terraform Apply (opt-in)', 'apply', {'APPLY_EXIT': '4'}, 4),
+        ]
+        for name, stage, env, status in cases:
+            with self.subTest(stage=stage):
+                self.summary.unlink(missing_ok=True)
+                result = self.bash(run_block(name), **env)
+                self.assertEqual(result.returncode, status)
+                summary = self.summary.read_text()
+                self.assertIn(f'Terraform {stage} failed', summary)
+                self.assertIn(f'exit status {status}', summary.lower())
+                self.assertIn(f'Terraform {stage} failed', result.stdout + result.stderr)
+                self.assertNotIn('SECRET', summary + result.stdout + result.stderr)
+                self.assertNotIn('secret.example', summary + result.stdout + result.stderr)
+                if stage == 'apply':
+                    self.assertIn('partial', summary.lower())
+                    self.assertIn('retry', summary.lower())
+
+    def test_success_has_no_failure_report_and_failed_summary_keeps_exit_code(self):
+        result = self.bash(run_block('Terraform Init'))
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout + result.stderr, '')
+        self.assertFalse(self.summary.exists())
+        self.summary.mkdir()
+        result = self.bash(run_block('Terraform Init'), STAGE_EXIT='13')
+        self.assertEqual(result.returncode, 13)
+        self.assertIn('exit status 13', result.stdout)
+        self.assertNotIn('SECRET', result.stdout + result.stderr)
+
+    def test_output_file_failure_does_not_run_terraform(self):
+        (self.root / 'init-result.txt').mkdir()
+        result = self.bash(run_block('Terraform Init'))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Terraform init failed', self.summary.read_text())
+        self.assertFalse(self.calls.exists())
+        self.assertNotIn('SECRET', result.stdout + result.stderr + self.summary.read_text())
+
+    def test_failure_report_rejects_untrusted_stage(self):
+        result = self.bash('bash "$ACTION_PATH/run-terraform.sh" "SECRET" terraform plan')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('SECRET', result.stdout + result.stderr)
+        self.assertFalse(self.calls.exists())
+        self.assertFalse(self.summary.exists())
+
     def test_plan_exit_stale_plan_and_apply_command(self):
         plan = run_block('Terraform Plan')
         apply = run_block('Terraform Apply (opt-in)')
@@ -133,7 +183,7 @@ class LocalTerraformTests(unittest.TestCase):
             env = {key: value for key, value in os.environ.items()
                    if not key.startswith(('TF_', 'ARM_', 'AWS_', 'GOOGLE_'))}
             env.update(HOME=temp, TF_CLI_CONFIG_FILE=str(root / 'terraform.rc'),
-                       TF_IN_AUTOMATION='1', PLAN_ARGS='', PLAN_OUTCOME='success',
+                       TF_IN_AUTOMATION='1', PLAN_ARGS='', PLAN_OUTCOME='success', ACTION_PATH=str(ACTION),
                        GITHUB_STEP_SUMMARY=str(root / 'summary'), RUNNER_TEMP=temp)
 
             def run(command):
