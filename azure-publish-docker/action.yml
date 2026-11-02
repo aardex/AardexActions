@@ -37,6 +37,15 @@ inputs:
     required: false
     default: ''
     description: "Docker build args (multi-line KEY=VALUE)"
+  nuget-secret-mode:
+    required: false
+    default: 'false'
+    description: "Mount github-token as the nuget_pat BuildKit secret instead of a build argument"
+
+outputs:
+  digest:
+    description: "Published image manifest digest"
+    value: ${{ steps.build.outputs.digest }}
 
 runs:
   using: composite
@@ -64,8 +73,22 @@ runs:
       with:
         driver: docker-container
 
+    - name: Reject NuGet token build arguments in secret mode
+      if: ${{ inputs.nuget-secret-mode == 'true' }}
+      shell: bash
+      env:
+        EXTRA_BUILD_ARGS: ${{ inputs.build-args }}
+      run: |
+        if printf '%s\n' "$EXTRA_BUILD_ARGS" | grep -Eq '^[[:space:]]*NUGET_PAT([[:space:]]*=|[[:space:]]*$)'; then
+          echo 'NUGET_PAT must not be supplied as a build argument in secret mode.' >&2
+          exit 1
+        fi
+
     - name: Build and push Docker image ${{ inputs.image-name }}:${{ inputs.version }}
+      id: build
       uses: docker/build-push-action@v5
+      env:
+        NUGET_PAT_SECRET: ${{ inputs.github-token }}
       with:
         context: .
         file: ${{ inputs.docker-directory }}/${{ inputs.dockerfile-name }}
@@ -78,6 +101,7 @@ runs:
         cache-from: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache
         cache-to: type=registry,ref=${{ inputs.acr-login-server }}/${{ inputs.image-name }}:buildcache,mode=max
         build-args: |
-          NUGET_PAT=${{ inputs.github-token }}
+          ${{ inputs.nuget-secret-mode != 'true' && format('NUGET_PAT={0}', inputs.github-token) || '' }}
           ${{ inputs.build-args }}
+        secret-envs: ${{ inputs.nuget-secret-mode == 'true' && 'nuget_pat=NUGET_PAT_SECRET' || '' }}
         provenance: false

@@ -60,6 +60,14 @@ inputs:
     required: false
     default: 'false'
     description: "Skip vulnerability check"
+  nuget-secret-mode:
+    required: false
+    default: 'false'
+    description: "Use a BuildKit secret for the NuGet token"
+  deploy-by-digest:
+    required: false
+    default: 'false'
+    description: "Scan and deploy the exact image digest returned by the build"
 
 runs:
   using: composite
@@ -81,12 +89,30 @@ runs:
         dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}
         build-args: ${{ inputs.build-args }}
+        nuget-secret-mode: ${{ inputs.nuget-secret-mode }}
+
+    - name: Resolve image reference
+      id: image
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.acr-login-server }}
+        IMAGE: ${{ inputs.image-name }}
+        VERSION: ${{ steps.publish.outputs.version }}
+        DIGEST: ${{ steps.publish.outputs.digest }}
+        BY_DIGEST: ${{ inputs.deploy-by-digest }}
+      run: |
+        if [[ "$BY_DIGEST" == 'true' ]]; then
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Build did not return a valid image digest.' >&2; exit 1; }
+          echo "reference=$REGISTRY/$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
+        else
+          echo "reference=$REGISTRY/$IMAGE:$VERSION" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Scan Docker image for vulnerabilities
       if: ${{ inputs.skip-check != 'true' }}
       uses: aquasecurity/trivy-action@0.35.0
       with:
-        image-ref: ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
+        image-ref: ${{ steps.image.outputs.reference }}
         format: 'table'
         exit-code: '1'
         ignore-unfixed: true
@@ -94,9 +120,11 @@ runs:
 
     - name: Update Azure Container Apps ${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
       shell: bash
+      env:
+        IMAGE_REFERENCE: ${{ steps.image.outputs.reference }}
       run: |
         az config set extension.use_dynamic_install=yes_without_prompt
         az containerapp update \
           --name ${{ inputs.ca-name }}-${{ inputs.azure-environment }} \
           --resource-group ${{ inputs.ca-resource-group }} \
-          --image ${{ inputs.acr-login-server }}/${{ inputs.image-name }}:${{ steps.publish.outputs.version }}
+          --image "$IMAGE_REFERENCE"
