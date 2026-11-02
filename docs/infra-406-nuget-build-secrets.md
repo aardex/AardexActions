@@ -7,3 +7,5 @@ The Docker publishing actions keep their existing `NUGET_PAT` build-argument beh
 The current registry cache is exported with `mode=max`. A Dockerfile must not copy the mounted secret into any filesystem snapshot or diagnostic output. Previously exported cache, historical image layers and logs are not remediated by this change. The opt-in mode requires consumer-specific build and cache inspection; the Python contract tests do not run BuildKit or contact a registry.
 
 Run `python3 -m unittest discover -s tests -v` for local synthetic contract tests. They execute only local Bash and do not access external services.
+
+To exercise the nested composite-action input and output wiring locally, run `python3 tests/nested_action_smoke.py` with `act`, Docker, and a locally cached `postgres:17` image (or set `INFRA406_ACT_IMAGE` to a cached image with Bash and coreutils). The runner has no network or Docker socket. Azure login, Buildx, and the vulnerability scanner are replaced by local stubs; this is a wiring test and does not replace hosted Actions, image build, or registry integration tests.
