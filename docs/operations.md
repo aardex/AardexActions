@@ -5,7 +5,7 @@ These are job-scoped composite actions, not a persistent service. There is no re
 Available evidence at this revision:
 
 - GitHub Actions step/job status and logs in the **consumer** workflow run. Failures in setup, build, test, publish or deploy are surfaced there; check the action ref and the failing step before troubleshooting. Do not share raw logs until reviewed for credentials or generated config.
-- Terraform deploy/destroy upload `tfplan`/`tfdestroy` artifacts containing saved plan, JSON and `result.txt`, retention 15 days. Upload and `terraform show` use `if: always()` and may report additional errors when planning failed. Artifacts can expose sensitive infrastructure data; follow consumer access rules.
+- Terraform deploy publishes only a sanitized count summary and keeps plan and captured output on the runner; see its [restricted review procedure](../terraform-deploy/README.md#restricted-detailed-review). Existing historical artifacts remain subject to their retention. Terraform destroy still uploads `tfdestroy` artifacts containing saved plan, JSON and `result.txt` for 15 days; they can expose sensitive infrastructure data.
 - `terraform-docs` uploads generated documentation; .NET actions run tests, and .NET App Service/Java actions can send coverage to Codecov when configured. Container App deploy uses Trivy with HIGH/CRITICAL exit-code 1 unless `skip-check` is true. A scan passing is not a production health check.
 - After a target-side deployment, consult Azure App Service/Functions/Container Apps, ACR, GitHub Packages or the relevant consumer's telemetry for runtime state. This repository neither configures those signals nor proves deployment health from a completed job.
 
