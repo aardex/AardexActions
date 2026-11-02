@@ -79,8 +79,48 @@ runs:
       env:
         EXTRA_BUILD_ARGS: ${{ inputs.build-args }}
       run: |
-        if printf '%s\n' "$EXTRA_BUILD_ARGS" | grep -Eq '^[[:space:]]*NUGET_PAT([[:space:]]*=|[[:space:]]*$)'; then
-          echo 'NUGET_PAT must not be supplied as a build argument in secret mode.' >&2
+        # Buildx parses CSV records, so a quoted value can span multiple lines.
+        # Scan complete records without treating lines inside a value as new args.
+        if ! printf '%s\n' "$EXTRA_BUILD_ARGS" | LC_ALL=C awk '
+          function check_record() {
+            if (record ~ "^" ws "*\"?" ws "*NUGET_PAT(" ws "*=|" ws "*\"?" ws "*$)") bad = 1
+            record = ""
+            field_start = 1
+          }
+          BEGIN { field_start = 1 }
+          { input = input $0 "\n" }
+          END {
+            # The downstream parser trims the input and detects its first
+            # unquoted record delimiter (LF, CRLF or CR).
+            ws = "([[:space:]]|\302\240|\341\232\200|\342\200[\200-\212\250\251\257]|\342\201\237|\343\200\200|\357\273\277)"
+            sub("^" ws "*", "", input)
+            sub(ws "*$", "", input)
+            for (i = 1; i <= length(input); i++) {
+              c = substr(input, i, 1)
+              next_c = substr(input, i + 1, 1)
+              if (!quoted && delimiter == "" && (c == "\r" || c == "\n")) {
+                delimiter = (c == "\r" && next_c == "\n") ? "\r\n" : c
+              }
+              if (!quoted && delimiter != "" && substr(input, i, length(delimiter)) == delimiter) {
+                check_record()
+                i += length(delimiter) - 1
+                continue
+              }
+              record = record c
+              if (quoted && c == "\"") {
+                if (next_c == "\"") {
+                  record = record "\""
+                  i++
+                } else quoted = 0
+              } else if (!quoted && c == ",") field_start = 1
+              else if (!quoted && field_start && c == "\"") { quoted = 1; field_start = 0 }
+              else if (!quoted) field_start = 0
+            }
+            check_record()
+            if (quoted || bad) exit 1
+          }
+        '; then
+          echo 'Invalid build arguments or NUGET_PAT is not allowed in secret mode.' >&2
           exit 1
         fi
 
