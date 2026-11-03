@@ -47,11 +47,18 @@ inputs:
     required: false
     default: ''
     description: "Docker build args (multi-line KEY=VALUE)"
+  nuget-secret-mode:
+    required: false
+    default: 'false'
+    description: "Use a BuildKit secret for the NuGet token"
 
 outputs:
   version:
     description: "The version used to build and push the Docker image"
     value: ${{ steps.resolve_version.outputs.version }}
+  digest:
+    description: "Published image manifest digest"
+    value: ${{ steps.publish.outputs.digest }}
 
 runs:
   using: composite
@@ -88,6 +95,7 @@ runs:
         python3 "${{ github.action_path }}/../scripts/azure/update-config.py" --token ${{ inputs.github-token }} --repo ${{ github.repository }} --repo-env ${{ inputs.environment }} --config-path ${{ inputs.config-file-path }}
 
     - name: Build and push Docker image
+      id: publish
       uses: aardex/AardexActions/azure-publish-docker@main
       with:
         image-name: ${{ inputs.image-name }}
@@ -100,3 +108,4 @@ runs:
         dockerfile-name: ${{ inputs.dockerfile-name }}
         platforms: ${{ inputs.platforms }}
         build-args: ${{ inputs.build-args }}
+        nuget-secret-mode: ${{ inputs.nuget-secret-mode }}
