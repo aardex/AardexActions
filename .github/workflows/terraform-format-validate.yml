@@ -19,3 +19,14 @@ jobs:
           terraform_version: 1.13.3
           terraform_wrapper: false
       - run: python3 -m unittest discover -s terraform-format-validate/tests -v
+      - name: Create provider-less fixture
+        run: |
+          mkdir -p "$RUNNER_TEMP/terraform-fixture"
+          printf 'terraform { required_version = ">= 1.0" }\noutput "value" { value = "fixture" }\n' > "$RUNNER_TEMP/terraform-fixture/main.tf"
+      - name: Run composite action without credentials
+        uses: ./terraform-format-validate
+        with:
+          directory: ${{ runner.temp }}/terraform-fixture
+          fix: 'false'
+          auto-commit: 'false'
+          init-backend: 'false'
