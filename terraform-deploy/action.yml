@@ -345,7 +345,7 @@ runs:
     # saved-apply action so it remains independent of the reviewed checkout.
     - name: Apply reviewed saved plan
       if: ${{ inputs.execution-mode == 'reviewed-apply' }}
-      uses: aardex/AardexActions/terraform-apply-saved@b6bc7e2c72f868102908b454223a4157f2dd7689
+      uses: aardex/AardexActions/terraform-apply-saved@53c4effaa17146b2beb1e1c44f19f6c7667c63ea
       with:
         azure-credentials: ${{ inputs.azure-credentials }}
         azure-subscription: ${{ inputs.azure-subscription }}
@@ -359,3 +359,4 @@ runs:
         plan-storage-account: ${{ inputs.plan-storage-account }}
         plan-storage-container: ${{ inputs.plan-storage-container }}
         plan-events-container: ${{ inputs.plan-events-container }}
+        apply-summary-mode: ${{ inputs.apply-summary-mode }}
