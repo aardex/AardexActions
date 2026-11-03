@@ -131,6 +131,44 @@ def lower_headers(headers):
     return {key.lower(): value for key, value in headers.items()}
 
 
+def expiry_from_headers(headers):
+    try:
+        now = parsedate_to_datetime(headers['date'])
+        created = parsedate_to_datetime(headers['last-modified'])
+        age = now - created
+        etag = headers['etag']
+        local_now = dt.datetime.now(dt.timezone.utc)
+        if (not etag or age < dt.timedelta(0) or age >= TTL or
+                abs((local_now - now).total_seconds()) > 120):
+            raise ValueError()
+        expires_at = int((local_now + TTL - age).timestamp()) - 2
+        if expires_at <= int(local_now.timestamp()):
+            raise ValueError()
+        return expires_at
+    except (KeyError, ValueError, TypeError, OverflowError):
+        raise PlanError('Stored plan is expired or has invalid storage metadata.') from None
+
+
+def inspect(store, env):
+    # The repository and environment are supplied independently by the caller;
+    # only the plan-specific fields are derived from the stored metadata.
+    repo = require(env.get('GITHUB_REPOSITORY', ''), REPO)
+    environment = require(env.get('PLAN_ENVIRONMENT', ''), SIMPLE)
+    plan_id = validate_id(env.get('PLAN_ID', ''), {'repo': repo, 'environment': environment})
+    headers = lower_headers(store.head(env['PLAN_CONTAINER'], blob_name(plan_id)))
+    metadata = {key[10:]: value for key, value in headers.items() if key.startswith('x-ms-meta-')}
+    derived = context({**env, 'PLAN_WORKSPACE': metadata.get('workspace'),
+                       'PLAN_COMMIT': metadata.get('commit'), 'PLAN_ROOT': metadata.get('root'),
+                       'PLAN_TERRAFORM_VERSION': metadata.get('tfversion')})
+    digest = require(metadata.get('sha256'), DIGEST)
+    for key, value in {**derived, 'sha256': digest, 'runid': plan_id.split('/')[3],
+                       'attempt': plan_id.split('/')[4]}.items():
+        if metadata.get(key) != value:
+            raise PlanError('Stored plan metadata does not match the requested plan.')
+    expiry_from_headers(headers)
+    return derived, digest
+
+
 def publish(store, env, plan_path, *, plan_id=None):
     ctx = context(env)
     run = require(env.get('GITHUB_RUN_ID', ''), re.compile(r'^[1-9][0-9]{0,19}$'))
@@ -165,22 +203,8 @@ def acquire(store, env, output_dir):
                        'attempt': plan_id.split('/')[4]}.items():
         if metadata.get(key) != value:
             raise PlanError('Stored plan metadata does not match the requested plan.')
-    try:
-        now = parsedate_to_datetime(headers['date'])
-        created = parsedate_to_datetime(headers['last-modified'])
-        age = now - created
-        etag = headers['etag']
-        local_now = dt.datetime.now(dt.timezone.utc)
-        if (not etag or age < dt.timedelta(0) or age >= TTL or
-                abs((local_now - now).total_seconds()) > 120):
-            raise ValueError()
-        # Map the server's remaining lifetime to the runner clock, conservatively.
-        expires_at = int((local_now + TTL - age).timestamp()) - 2
-        if expires_at <= int(local_now.timestamp()):
-            raise ValueError()
-    except (KeyError, ValueError, TypeError, OverflowError):
-        raise PlanError('Stored plan is expired or has invalid storage metadata.') from None
-    data = store.get(env['PLAN_CONTAINER'], blob_name(plan_id), etag)
+    expires_at = expiry_from_headers(headers)
+    data = store.get(env['PLAN_CONTAINER'], blob_name(plan_id), headers['etag'])
     if not data or hashlib.sha256(data).hexdigest() != expected:
         raise PlanError('Stored plan checksum does not match the reviewed checksum.')
     # Write locally before claiming, so failures cannot strand a claim unnecessarily.
@@ -215,7 +239,7 @@ def emit_output(name, value):
 def main():
     env = os.environ
     try:
-        if len(sys.argv) != 2 or sys.argv[1] not in ('publish', 'acquire', 'record'):
+        if len(sys.argv) != 2 or sys.argv[1] not in ('publish', 'inspect', 'acquire', 'record'):
             raise PlanError('Invalid plan storage operation.')
         for key in ('PLAN_CONTAINER', 'EVENT_CONTAINER'):
             require(env.get(key, ''), CONTAINER)
@@ -229,6 +253,16 @@ def main():
                              f"Commit: `{env['PLAN_COMMIT']}`; environment: `{env['PLAN_ENVIRONMENT']}`; "
                              f"workspace: `{env['PLAN_WORKSPACE']}`; root: `{env['PLAN_ROOT']}`; "
                              f"Terraform: `{env['PLAN_TERRAFORM_VERSION']}`.\n")
+        elif sys.argv[1] == 'inspect':
+            ctx, digest = inspect(store, env)
+            for key, value in [('commit', ctx['commit']), ('workspace', ctx['workspace']),
+                               ('root', ctx['root']), ('version', ctx['tfversion']), ('sha256', digest)]:
+                emit_output(key, value)
+            with open(env['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as stream:
+                stream.write(f"\nPlan ID: `{env['PLAN_ID']}`  \nSHA-256 from Blob metadata: `{digest}`  \n"
+                             f"Commit: `{ctx['commit']}`; environment: `{ctx['environment']}`; "
+                             f"workspace: `{ctx['workspace']}`; root: `{ctx['root']}`; "
+                             f"Terraform: `{ctx['tfversion']}`.\n")
         elif sys.argv[1] == 'acquire':
             plan_id, path, expires_at = acquire(store, env, env['RUNNER_TEMP'])
             try:

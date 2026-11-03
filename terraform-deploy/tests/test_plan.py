@@ -275,8 +275,7 @@ esac
         reviewed_apply = {**base, 'EXECUTION_MODE': 'reviewed-apply', 'STORAGE_MODE': 'none'}
         self.assertEqual(self.bash(validation, **reviewed_apply).returncode, 0)
         self.assertEqual(self.bash(validation, **{**reviewed_apply, 'STORAGE_MODE': 'azure-blob'}).returncode, 0)
-        for field in ('STORAGE_ACCOUNT', 'PLAN_CONTAINER', 'EVENT_CONTAINER', 'PLAN_ENVIRONMENT',
-                      'PLAN_ID', 'PLAN_SHA256', 'PLAN_COMMIT', 'PLAN_WORKSPACE'):
+        for field in ('STORAGE_ACCOUNT', 'PLAN_CONTAINER', 'EVENT_CONTAINER', 'PLAN_ENVIRONMENT', 'PLAN_ID'):
             with self.subTest(field=field):
                 self.assertNotEqual(self.bash(validation, **{**reviewed_apply, field: ''}).returncode, 0)
         self.assertNotEqual(self.bash(validation, **{**reviewed_apply, 'APPLY_INPUT': 'true'}).returncode, 0)
@@ -288,6 +287,8 @@ esac
             self.assertIn("inputs.execution-mode != 'reviewed-apply'", step)
         self.assertIn("inputs.execution-mode == 'legacy' && steps.plan.outcome", MANIFEST)
         self.assertIn('terraform-apply-saved@b6bc7e2c72f868102908b454223a4157f2dd7689', MANIFEST)
+        self.assertIn('ref: ${{ steps.reviewed_plan.outputs.commit }}', MANIFEST)
+        self.assertIn('plan-sha256: ${{ steps.reviewed_plan.outputs.sha256 }}', MANIFEST)
 
     def test_plan_exit_stale_plan_and_apply_command(self):
         plan = run_block('Terraform Plan')

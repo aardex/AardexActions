@@ -103,11 +103,63 @@ class SecurePlanTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(fixture['payload_base64']), self.payload)
         self.blobs.create('tfplans', plan_id + '.tfplan', self.payload, fixture['metadata'])
         self.env['PLAN_ID'] = plan_id
+        derived, digest = store_module.inspect(self.blobs, self.env)
+        self.assertEqual(derived['commit'], self.env['PLAN_COMMIT'])
+        self.assertEqual(derived['workspace'], 'default')
+        self.assertEqual(derived['root'], 'terraform/environments/alpha')
+        self.assertEqual(digest, self.sha)
         _, path, _ = store_module.acquire(self.blobs, self.env, self.dir)
         self.assertEqual(Path(path).read_bytes(), self.payload)
         self.assertIn(('tfplan-events', plan_id + '.claim'), self.blobs.items)
         with self.assertRaises(store_module.PlanError):
             store_module.acquire(self.blobs, self.env, self.dir)
+
+    def test_inspection_rejects_wrong_context_bad_metadata_and_expiration(self):
+        plan_id = self.publish()
+        for key, value in [('GITHUB_REPOSITORY', 'aardex/Other'), ('PLAN_ENVIRONMENT', 'beta')]:
+            with self.subTest(key=key), self.assertRaises(store_module.PlanError):
+                store_module.inspect(self.blobs, {**self.env, key: value})
+        metadata = self.blobs.items[('tfplans', plan_id + '.tfplan')]['metadata']
+        for key, value in [('repo', 'aardex/Other'), ('environment', 'beta'), ('commit', 'bad'),
+                           ('workspace', '../bad'), ('root', '../bad'), ('tfversion', 'bad'),
+                           ('sha256', 'bad'), ('runid', '987'), ('attempt', '2')]:
+            old = metadata[key]
+            metadata[key] = value
+            with self.subTest(key=key), self.assertRaises(store_module.PlanError):
+                store_module.inspect(self.blobs, self.env)
+            metadata[key] = old
+        self.blobs.now = self.blobs.created + dt.timedelta(days=7)
+        with self.assertRaises(store_module.PlanError):
+            store_module.inspect(self.blobs, self.env)
+        self.assertNotIn(('tfplan-events', plan_id + '.claim'), self.blobs.items)
+
+    def test_changed_metadata_after_inspection_is_rejected_without_claim(self):
+        plan_id = self.publish()
+        derived, digest = store_module.inspect(self.blobs, self.env)
+        expected = {**self.env, 'PLAN_COMMIT': derived['commit'], 'PLAN_WORKSPACE': derived['workspace'],
+                    'PLAN_ROOT': derived['root'], 'PLAN_TERRAFORM_VERSION': derived['tfversion'],
+                    'PLAN_SHA256': digest}
+        item = self.blobs.items[('tfplans', plan_id + '.tfplan')]
+        item['metadata']['commit'] = 'b' * 40
+        with self.assertRaises(store_module.PlanError):
+            store_module.acquire(self.blobs, expected, self.dir)
+        self.assertNotIn(('tfplan-events', plan_id + '.claim'), self.blobs.items)
+
+    def test_inspection_outputs_only_validated_metadata_not_plan_bytes(self):
+        self.publish()
+        outputs, summary = self.dir / 'outputs', self.dir / 'summary'
+        env = {**self.env, 'PLAN_STORAGE_ACCOUNT': 'validaccount', 'GITHUB_OUTPUT': str(outputs),
+               'GITHUB_STEP_SUMMARY': str(summary)}
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(sys, 'argv', ['tool', 'inspect']), \
+             mock.patch.object(store_module, 'token', return_value='fixture-token'), \
+             mock.patch.object(store_module, 'BlobStore', return_value=self.blobs), \
+             contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(store_module.main(), 0)
+        visible = outputs.read_text() + summary.read_text() + out.getvalue() + err.getvalue()
+        self.assertIn('sha256=' + self.sha, visible)
+        self.assertIn('commit=' + self.env['PLAN_COMMIT'], visible)
+        self.assertNotIn(self.payload.decode(), visible)
+        self.assertNotIn('fixture-token', visible)
 
     def test_reviewed_checkout_is_verified_before_initialization(self):
         action = (ACTION.parent / 'terraform-apply-saved/action.yml').read_text()

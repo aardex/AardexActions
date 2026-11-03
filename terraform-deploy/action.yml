@@ -56,16 +56,6 @@ inputs:
   plan-id:
     required: false
     description: "Identifier from the reviewed plan"
-  plan-sha256:
-    required: false
-    description: "SHA-256 copied from the reviewed plan summary"
-  plan-commit:
-    required: false
-    description: "Full commit SHA from the reviewed plan"
-  plan-workspace:
-    required: false
-    default: 'default'
-    description: "Terraform workspace from the reviewed plan"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -102,9 +92,6 @@ runs:
         EVENT_CONTAINER: ${{ inputs.plan-events-container }}
         PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
         PLAN_ID: ${{ inputs.plan-id }}
-        PLAN_SHA256: ${{ inputs.plan-sha256 }}
-        PLAN_COMMIT: ${{ inputs.plan-commit }}
-        PLAN_WORKSPACE: ${{ inputs.plan-workspace }}
       run: |
         case "$STORAGE_MODE" in
           none|azure-blob) ;;
@@ -124,8 +111,8 @@ runs:
             } ;;
           reviewed-apply)
             [[ "$APPLY_INPUT" == false ]] || { echo 'reviewed-apply requires apply=false.' >&2; exit 1; }
-            [[ -n "$STORAGE_ACCOUNT" && -n "$PLAN_CONTAINER" && -n "$EVENT_CONTAINER" && -n "$PLAN_ENVIRONMENT" && -n "$PLAN_ID" && -n "$PLAN_SHA256" && -n "$PLAN_COMMIT" && -n "$PLAN_WORKSPACE" ]] || {
-              echo 'reviewed-apply requires storage, environment and reviewed plan identifiers.' >&2; exit 1;
+            [[ -n "$STORAGE_ACCOUNT" && -n "$PLAN_CONTAINER" && -n "$EVENT_CONTAINER" && -n "$PLAN_ENVIRONMENT" && -n "$PLAN_ID" ]] || {
+              echo 'reviewed-apply requires storage, environment and a plan ID.' >&2; exit 1;
             } ;;
           *) echo 'Unsupported execution mode.' >&2; exit 1 ;;
         esac
@@ -299,8 +286,43 @@ runs:
       working-directory: ${{ inputs.directory }}
       run: bash "${{ github.action_path }}/run-terraform.sh" apply terraform apply -input=false -auto-approve tfplan.tfplan
 
-    # Composite actions cannot refer to a sibling in their own checkout with a
-    # relative uses path. Pin the existing implementation and its storage format.
+    - name: Authenticate for reviewed plan lookup
+      if: ${{ inputs.execution-mode == 'reviewed-apply' }}
+      shell: bash
+      env:
+        AZURE_CREDENTIALS: ${{ inputs.azure-credentials }}
+        AZURE_SUBSCRIPTION: ${{ inputs.azure-subscription }}
+      run: |
+        client_id=$(jq -er .clientId <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        client_secret=$(jq -er .clientSecret <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        tenant_id=$(jq -er .tenantId <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        subscription_id=${AZURE_SUBSCRIPTION:-$(jq -er .subscriptionId <<< "$AZURE_CREDENTIALS" 2>/dev/null)}
+        az login --service-principal -u "$client_id" -p "$client_secret" --tenant "$tenant_id" --output none >/dev/null 2>&1
+        az account set --subscription "$subscription_id"
+
+    - name: Resolve reviewed plan metadata
+      id: reviewed_plan
+      if: ${{ inputs.execution-mode == 'reviewed-apply' }}
+      shell: bash
+      env:
+        PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
+        PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
+        EVENT_CONTAINER: ${{ inputs.plan-events-container }}
+        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
+        PLAN_ID: ${{ inputs.plan-id }}
+      run: python3 "${{ github.action_path }}/plan_store.py" inspect
+
+    - name: Checkout reviewed commit
+      if: ${{ inputs.execution-mode == 'reviewed-apply' }}
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ steps.reviewed_plan.outputs.commit }}
+        token: ${{ inputs.github-token }}
+        clean: false
+        persist-credentials: false
+
+    # A relative uses path resolves to the consumer checkout. Pin the existing
+    # saved-apply action so it remains independent of the reviewed checkout.
     - name: Apply reviewed saved plan
       if: ${{ inputs.execution-mode == 'reviewed-apply' }}
       uses: aardex/AardexActions/terraform-apply-saved@b6bc7e2c72f868102908b454223a4157f2dd7689
@@ -310,9 +332,9 @@ runs:
         github-token: ${{ inputs.github-token }}
         directory: ${{ inputs.directory }}
         plan-id: ${{ inputs.plan-id }}
-        plan-sha256: ${{ inputs.plan-sha256 }}
-        plan-commit: ${{ inputs.plan-commit }}
-        plan-workspace: ${{ inputs.plan-workspace }}
+        plan-sha256: ${{ steps.reviewed_plan.outputs.sha256 }}
+        plan-commit: ${{ steps.reviewed_plan.outputs.commit }}
+        plan-workspace: ${{ steps.reviewed_plan.outputs.workspace }}
         plan-environment: ${{ inputs.plan-environment }}
         plan-storage-account: ${{ inputs.plan-storage-account }}
         plan-storage-container: ${{ inputs.plan-storage-container }}
