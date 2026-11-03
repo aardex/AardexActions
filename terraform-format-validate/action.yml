@@ -3,8 +3,8 @@ description: Format and validate Terraform module for a given directory
 
 inputs:
   azure-credentials:
-    required: true
-    description: "Azure credentials in JSON format"
+    required: false
+    description: "Optional Azure credentials in JSON format"
   directory:
     description: Directory to format and validate
     required: true
@@ -22,30 +22,35 @@ inputs:
     required: false
     default: 'chore(terraform): auto-format files [skip ci]'
   github-token:
-    required: true
-    description: "GitHub token for authentication"
+    required: false
+    description: "Optional GitHub token for private modules and authenticated pushes"
+  init-backend:
+    required: false
+    default: 'true'
+    description: "Initialize the configured backend; set false for offline backend validation"
 
 runs:
   using: composite
   steps:
     - name: Extract Azure credentials
+      if: ${{ inputs.azure-credentials != '' }}
       shell: bash
-      id: creds
+      env:
+        AZURE_CREDENTIALS: ${{ inputs.azure-credentials }}
       run: |
-        echo "ARM_CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)" >> $GITHUB_ENV
-        echo "ARM_CLIENT_SECRET=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientSecret)" >> $GITHUB_ENV
-        echo "ARM_SUBSCRIPTION_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .subscriptionId)" >> $GITHUB_ENV
-        echo "ARM_TENANT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .tenantId)" >> $GITHUB_ENV
+        set -euo pipefail
+        for pair in ARM_CLIENT_ID:clientId ARM_CLIENT_SECRET:clientSecret ARM_SUBSCRIPTION_ID:subscriptionId ARM_TENANT_ID:tenantId; do
+          name=${pair%%:*}
+          key=${pair#*:}
+          value=$(jq -er --arg key "$key" '.[$key] | select(type == "string" and length > 0)' <<< "$AZURE_CREDENTIALS")
+          echo "::add-mask::$value"
+          printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+        done
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
       with:
         terraform_version: 1.13.3
-
-    - name: Configure Git credential URL
-      shell: bash
-      run: |
-        git config --global url."https://${{ inputs.github-token }}@github.com/".insteadOf "https://github.com/"
 
     - name: Format Terraform files
       id: format
@@ -61,7 +66,10 @@ runs:
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform init -upgrade -input=false
+      env:
+        GH_MODULE_TOKEN: ${{ inputs.github-token }}
+        INIT_BACKEND: ${{ inputs.init-backend }}
+      run: bash "$GITHUB_ACTION_PATH/init.sh"
 
     - name: Validate Terraform files
       id: validate
@@ -78,7 +86,11 @@ runs:
       if: ${{ (inputs.auto-commit == 'true') || (inputs.auto-commit == 'auto' && inputs.fix == 'true') }}
       shell: bash
       working-directory: ${{ inputs.directory }}
+      env:
+        GH_MODULE_TOKEN: ${{ inputs.github-token }}
+        COMMIT_MESSAGE: ${{ inputs.auto-commit-message }}
       run: |
+        set -euo pipefail
         if git diff --quiet && git diff --cached --quiet; then
           echo "No changes to commit."
           exit 0
@@ -93,7 +105,7 @@ runs:
           exit 0
         fi
 
-        git commit -m "${{ inputs.auto-commit-message }}"
+        git commit -m "$COMMIT_MESSAGE"
 
         BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}}"
         if [ "$BRANCH" = "HEAD" ] || [ -z "$BRANCH" ]; then
@@ -101,4 +113,4 @@ runs:
           exit 1
         fi
 
-        git push origin "HEAD:${BRANCH}"
+        bash "$GITHUB_ACTION_PATH/push.sh" "$BRANCH"

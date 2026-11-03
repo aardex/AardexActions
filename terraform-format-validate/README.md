@@ -1,50 +1,40 @@
 # Terraform Format and Validate
 
-For a given directory, format the code recursively and validate the Terraform files.
+Formats and validates a Terraform directory. Existing defaults remain `fix: 'true'`, `auto-commit: 'auto'`, and `init-backend: 'true'`; these can modify files, push changes, and initialize a configured remote backend. Callers must choose an appropriate trust boundary.
 
 ## Inputs
 
-- `azure-credentials` (required): Azure credentials in JSON format.
-- `directory` (optional, default: `.`): Directory to format and validate.
-- `github-token` (required): GitHub token for authentication.
-- `fix` (optional, default: `true`): If `true`, runs `terraform fmt -recursive`. If `false`, runs `terraform fmt -check -recursive`.
-- `auto-commit` (optional, default: `auto`):
-  - `true`: always commit/push formatting changes (if any)
-  - `false`: never commit/push
-  - `auto`: commit/push only when `fix=true`
-- `auto-commit-message` (optional): Commit message used when `auto-commit` is enabled.
+- `directory` (required): Terraform directory.
+- `azure-credentials` (optional): Azure service-principal JSON, needed only where the caller's backend or providers require it. Invalid or incomplete nonempty JSON fails the job.
+- `github-token` (optional): GitHub credential for private modules and, when auto-commit is enabled, pushing. It is scoped to the init/push process and is not written to global Git configuration. A repository's `GITHUB_TOKEN` does not normally grant access to another private repository.
+- `init-backend` (optional, default `true`): Set `false` to use `terraform init -backend=false` for backend-independent validation. Dependencies and providers are still downloaded.
+- `fix` (optional, default `true`): Set `false` for `terraform fmt -check -recursive`.
+- `auto-commit` (optional, default `auto`): `true` pushes changes, `false` never pushes, `auto` pushes when `fix` is `true`.
+- `auto-commit-message` (optional): Commit message when auto-commit is enabled.
 
-## Usage
+## Read-only validation
 
 ```yaml
-jobs:
-  validate:
-    name: Validate and Format Terraform module
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Terraform Format and Validate
-        uses: aardex/AardexActions/terraform-format-validate@main
-        with:
-          azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          directory: "./iac"
-          fix: "true"
-          auto-commit: "auto"
-          auto-commit-message: "chore(terraform): auto-format files [skip ci]"
+permissions:
+  contents: read
+steps:
+  - uses: actions/checkout@v4
+    with:
+      persist-credentials: false
+  - uses: aardex/AardexActions/terraform-format-validate@<full-commit-sha>
+    with:
+      directory: ./iac
+      fix: 'false'
+      auto-commit: 'false'
+      init-backend: 'false'
+      # Only if private modules are required: use a dedicated read-only credential.
+      github-token: ${{ secrets.TERRAFORM_MODULES_READ_TOKEN }}
 ```
 
-## Strict mode (no auto-fix)
+PR code can access credentials passed to its job; scope any module credential to read-only access to the minimum repositories and treat disclosure as possible. A run with private modules fails if access is unavailable; no module-validation fallback is performed.
 
-```yaml
-with:
-  azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
-  github-token: ${{ secrets.GITHUB_TOKEN }}
-  directory: "./iac"
-  fix: "false"
-  auto-commit: "false"
-```
+For trusted auto-commit callers, retain appropriate branch authorization and write credentials. If using `github-token` for pushes, avoid checkout's persisted authorization header (`persist-credentials: false`) so it does not override that credential. Branch protection can still reject a push. Test with a disposable remote before adoption.
+
+## Safe local contract tests
+
+`python3 -m unittest discover -s terraform-format-validate/tests -v` uses temporary local Git repositories, a synthetic credential, a provider-less Terraform fixture and a local-only provider installation configuration. It performs no deployment, backend access, or remote Git push. Terraform must be installed locally. Hosted action resolution, private module access, and protected-branch authorization need separate consumer verification.
