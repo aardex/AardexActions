@@ -1,0 +1,32 @@
+name: Terraform format validate tests
+on:
+  pull_request:
+    paths: [terraform-format-validate/**, .github/workflows/terraform-format-validate.yml]
+  push:
+    branches: [main]
+    paths: [terraform-format-validate/**, .github/workflows/terraform-format-validate.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.13.3
+          terraform_wrapper: false
+      - run: python3 -m unittest discover -s terraform-format-validate/tests -v
+      - name: Create provider-less fixture
+        run: |
+          mkdir -p "$RUNNER_TEMP/terraform-fixture"
+          printf 'terraform { required_version = ">= 1.0" }\noutput "value" { value = "fixture" }\n' > "$RUNNER_TEMP/terraform-fixture/main.tf"
+      - name: Run composite action without credentials
+        uses: ./terraform-format-validate
+        with:
+          directory: ${{ runner.temp }}/terraform-fixture
+          fix: 'false'
+          auto-commit: 'false'
+          init-backend: 'false'
