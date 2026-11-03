@@ -42,8 +42,8 @@ runs:
         for pair in ARM_CLIENT_ID:clientId ARM_CLIENT_SECRET:clientSecret ARM_SUBSCRIPTION_ID:subscriptionId ARM_TENANT_ID:tenantId; do
           name=${pair%%:*}
           key=${pair#*:}
-          value=$(jq -er --arg key "$key" '.[$key] | select(type == "string" and length > 0)' <<< "$AZURE_CREDENTIALS")
-          echo "::add-mask::$value"
+          value=$(jq -ser --arg key "$key" 'select(length == 1) | .[0][$key] | select(type == "string" and length > 0) | select(test("[\r\n]") | not)' <<< "$AZURE_CREDENTIALS")
+          printf '::add-mask::%s\n' "${value//%/%25}"
           printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
         done
 
