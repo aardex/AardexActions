@@ -27,6 +27,10 @@ inputs:
     required: false
     default: ''
     description: "Additional arguments to pass to terraform plan (e.g., '-refresh=true -replace=xxx')"
+  plan-summary-mode:
+    required: false
+    default: 'counts-only'
+    description: "Plan summary: counts-only or human-readable (may expose sensitive data)"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -124,12 +128,13 @@ runs:
 
         bash "${{ github.action_path }}/run-terraform.sh" plan "${CMD[@]}"
 
-    - name: Sanitized Terraform plan summary
+    - name: Terraform plan summary
       if: ${{ always() && steps.plan.outcome != 'skipped' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       env:
         PLAN_OUTCOME: ${{ steps.plan.outcome }}
+        PLAN_SUMMARY_MODE: ${{ inputs.plan-summary-mode }}
       run: bash "${{ github.action_path }}/summarize-plan.sh"
 
     - name: Terraform Apply (opt-in)
