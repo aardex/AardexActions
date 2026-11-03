@@ -52,6 +52,7 @@ runs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.13.3
+        terraform_wrapper: false
 
     - name: Configure Git credential URL
       shell: bash
@@ -91,18 +92,21 @@ runs:
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform init -upgrade -input=false
+      run: bash "${{ github.action_path }}/run-terraform.sh" init terraform init -upgrade -input=false
 
     - name: Terraform Validate
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform validate -no-color
+      run: bash "${{ github.action_path }}/run-terraform.sh" validate terraform validate -no-color
 
     - name: Terraform Plan
+      id: plan
       shell: bash
       working-directory: ${{ inputs.directory }}
+      env:
+        PLAN_ARGS: ${{ inputs.plan-args }}
       run: |
-        PLAN_ARGS="${{ inputs.plan-args }}"
+        rm -f tfplan.tfplan result.txt
 
         if [ -f "terraform.tfvars" ]; then
           echo "✅ terraform.tfvars found, using it."
@@ -113,33 +117,23 @@ runs:
         fi
 
         if [ -n "$PLAN_ARGS" ]; then
-          echo "ℹ️ Adding custom plan arguments: $PLAN_ARGS"
           CMD+=($PLAN_ARGS)
         fi
 
         CMD+=(-out=tfplan.tfplan)
 
-        "${CMD[@]}" > result.txt 2>&1
+        bash "${{ github.action_path }}/run-terraform.sh" plan "${CMD[@]}"
 
-    - name: Terraform Show
-      if: always()
+    - name: Sanitized Terraform plan summary
+      if: ${{ always() && steps.plan.outcome != 'skipped' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform show -json tfplan.tfplan > tfplan.json
-
-    - name: Upload Plan Artifact
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: tfplan
-        path: |
-          ${{ inputs.directory }}/tfplan.tfplan
-          ${{ inputs.directory }}/tfplan.json
-          ${{ inputs.directory }}/result.txt
-        retention-days: 15
+      env:
+        PLAN_OUTCOME: ${{ steps.plan.outcome }}
+      run: bash "${{ github.action_path }}/summarize-plan.sh"
 
     - name: Terraform Apply (opt-in)
-      if: ${{ inputs.apply == 'true' }}
+      if: ${{ success() && steps.plan.outcome == 'success' && inputs.apply == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
-      run: terraform apply -input=false -auto-approve tfplan.tfplan
+      run: bash "${{ github.action_path }}/run-terraform.sh" apply terraform apply -input=false -auto-approve tfplan.tfplan
