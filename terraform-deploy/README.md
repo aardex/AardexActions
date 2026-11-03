@@ -17,7 +17,6 @@ This composite action logs in with an Azure service principal, initializes and v
 | `plan-storage-account` | For Blob mode | Private plan-storage account name |
 | `plan-storage-container`, `plan-events-container` | No | `tfplans` and `tfplan-events` respectively |
 | `plan-environment` | For Blob mode | Target environment bound into plan metadata and identifier |
-| `plan-storage-client-id`, `plan-storage-tenant-id` | For Blob mode | OIDC publisher identity and tenant; job requires `id-token: write` |
 
 Uses Terraform 1.13.3, runs `terraform init -upgrade -input=false`, `terraform validate -no-color`, then saves `tfplan.tfplan`. The binary plan and captured Terraform output (`init-result.txt`, `validate-result.txt`, `result.txt` and `apply-result.txt`) remain on the runner and are not uploaded by this action. `terraform show -json` is streamed directly into a filter. By default the job summary contains only fixed action categories and aggregate resource counts; replacements count once, separately from creates and deletes. The counts omit addresses, resource types, indices, values, outputs and variables. Unsupported action combinations, an invalid or missing plan, or a failed plan produce a generic unavailable message instead. The plan's exit status controls the step; apply runs only after a successful plan and preceding steps. The action no longer explicitly echoes plan arguments. Azure login and other consumer steps can still produce logs that require access controls and review. Do not put secrets or variable values in `plan-args`: GitHub Actions may expose step environment values; use the protected `tfvars-content` input instead.
 
@@ -31,7 +30,7 @@ GitHub limits a [step summary to 1 MiB](https://docs.github.com/en/actions/refer
 
 ### Secure saved-plan handoff
 
-Blob storage is opt-in. It requires the independently provisioned private storage, federated identities and a protected consumer apply environment described in the [reviewed apply contract](../terraform-apply-saved/README.md). The `plan-id` and `plan-sha256` outputs and job summary identify the saved binary; the separately dispatched apply requires the checksum copied from this original review record. The binary and its metadata are uploaded with a conditional create; a failed upload fails the action. For Blob mode, `apply: 'true'` is rejected rather than silently changing the existing immediate-apply behavior. Existing `plan-storage: none` consumers retain their original behavior. `apply: 'true'` without storage still immediately applies the local plan as before.
+Blob storage is opt-in. It requires the independently provisioned private storage and the existing authenticated Azure service principal described in the [reviewed apply contract](../terraform-apply-saved/README.md). The `plan-id` and `plan-sha256` outputs and job summary identify the saved binary; the separately dispatched apply requires the checksum copied from this original review record. The binary and its metadata are uploaded with a conditional create; a failed upload fails the action. For Blob mode, `apply: 'true'` is rejected rather than silently changing the existing immediate-apply behavior. Existing `plan-storage: none` consumers retain their original behavior. `apply: 'true'` without storage still immediately applies the local plan as before.
 
 ### Failure diagnostics
 

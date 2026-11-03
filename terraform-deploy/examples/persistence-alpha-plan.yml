@@ -1,12 +1,10 @@
 # Reference only: replace ACTION_COMMIT with a reviewed AardexActions commit SHA.
-# Before use, configure the alpha-plan environment and OIDC subject as documented.
 name: Persistence Alpha plan (reference)
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: persistence-alpha-terraform
@@ -14,7 +12,7 @@ concurrency:
 
 jobs:
   plan:
-    environment: alpha-plan
+    environment: alpha
     runs-on:
       group: Aardex
     steps:
@@ -42,5 +40,3 @@ jobs:
           plan-storage: azure-blob
           plan-environment: alpha
           plan-storage-account: ${{ vars.TF_PLAN_STORAGE_ACCOUNT }}
-          plan-storage-client-id: ${{ vars.TF_PLAN_PUBLISH_CLIENT_ID }}
-          plan-storage-tenant-id: ${{ vars.TF_PLAN_STORAGE_TENANT_ID }}

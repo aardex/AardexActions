@@ -221,6 +221,27 @@ class SecurePlanTests(unittest.TestCase):
             store_module.acquire(self.blobs, self.env, self.dir)
         self.assertIn(('tfplans', plan_id + '.tfplan'), self.blobs.items)
 
+    def test_token_uses_existing_azure_cli_session(self):
+        completed = mock.Mock(stdout='synthetic-token\n')
+        with mock.patch.object(store_module.subprocess, 'run', return_value=completed) as run:
+            self.assertEqual(store_module.token(), 'synthetic-token')
+        args = run.call_args.args[0]
+        self.assertEqual(args[:3], ['az', 'account', 'get-access-token'])
+        self.assertIn('https://storage.azure.com/', args)
+        self.assertNotIn('--tenant', args)
+        self.assertNotIn('--subscription', args)
+
+    def test_actions_do_not_use_storage_oidc(self):
+        plan = (ACTION / 'action.yml').read_text()
+        apply = (ACTION.parent / 'terraform-apply-saved/action.yml').read_text()
+        for manifest in (plan, apply):
+            self.assertNotIn('azure/login@', manifest)
+            self.assertNotIn('plan-storage-client-id', manifest)
+            self.assertNotIn('plan-storage-tenant-id', manifest)
+            self.assertNotIn('AZURE_CONFIG_DIR:', manifest)
+        self.assertIn('az login --service-principal', apply)
+        self.assertIn('az account set --subscription', apply)
+
     def test_http_create_uses_single_put_and_if_none_match(self):
         class Response:
             headers = {}

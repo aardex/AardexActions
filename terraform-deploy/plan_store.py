@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create-only Azure Blob plan transport. No plan bytes or tokens are logged."""
+"""Conditional Azure Blob plan transport. No plan bytes or tokens are logged."""
 import datetime as dt
 from email.utils import format_datetime, parsedate_to_datetime
 import hashlib
@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-MAX_PLAN = 32 * 1024 * 1024  # Single Put Blob; the create-only role cannot stage blocks.
+MAX_PLAN = 32 * 1024 * 1024  # Bound memory and use one conditional Put Blob.
 TTL = dt.timedelta(days=7)
 SIMPLE = re.compile(r'^[A-Za-z0-9_.-]{1,100}$')
 REPO = re.compile(r'^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$')
@@ -70,8 +70,7 @@ def blob_name(plan_id):
 
 def token():
     try:
-        tenant = str(uuid.UUID(os.environ.get('PLAN_STORAGE_TENANT_ID', '')))
-        value = subprocess.run(['az', 'account', 'get-access-token', '--tenant', tenant, '--resource',
+        value = subprocess.run(['az', 'account', 'get-access-token', '--resource',
                                 'https://storage.azure.com/', '--query', 'accessToken', '-o', 'tsv'],
                                check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                text=True, timeout=60).stdout.strip()

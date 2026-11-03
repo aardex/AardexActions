@@ -1,6 +1,4 @@
 # Reference only: replace ACTION_COMMIT with a reviewed AardexActions commit SHA.
-# The existing alpha environment currently has NO required reviewers. Configure
-# and verify required reviewers before use; this file does not configure them.
 name: Persistence Alpha reviewed apply (reference)
 on:
   workflow_dispatch:
@@ -25,8 +23,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
-  id-token: write
 
 concurrency:
   group: persistence-alpha-terraform
@@ -34,8 +30,6 @@ concurrency:
 
 jobs:
   apply:
-    # Required reviewers, no self-review, no admin bypass and trusted branches
-    # must be configured on this environment before the job is dispatched.
     environment: alpha
     runs-on:
       group: Aardex
@@ -64,5 +58,3 @@ jobs:
           plan-workspace: ${{ inputs.workspace }}
           plan-environment: alpha
           plan-storage-account: ${{ vars.TF_PLAN_STORAGE_ACCOUNT }}
-          plan-storage-client-id: ${{ vars.TF_PLAN_APPLY_CLIENT_ID }}
-          plan-storage-tenant-id: ${{ vars.TF_PLAN_STORAGE_TENANT_ID }}

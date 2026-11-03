@@ -49,12 +49,6 @@ inputs:
   plan-environment:
     required: false
     description: "Target environment name bound to the plan"
-  plan-storage-client-id:
-    required: false
-    description: "Federated create-only plan publisher identity client ID"
-  plan-storage-tenant-id:
-    required: false
-    description: "Tenant ID for the storage identity"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -225,24 +219,12 @@ runs:
           *) echo 'Unsupported plan summary mode; secure publication stopped.' >&2; exit 1 ;;
         esac
 
-    - name: Authenticate plan publisher
-      if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
-      uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
-      env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-publisher-${{ github.run_id }}-${{ github.run_attempt }}
-      with:
-        client-id: ${{ inputs.plan-storage-client-id }}
-        tenant-id: ${{ inputs.plan-storage-tenant-id }}
-        allow-no-subscriptions: true
-
     - name: Store reviewed plan
       id: store
       if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-publisher-${{ github.run_id }}-${{ github.run_attempt }}
-        PLAN_STORAGE_TENANT_ID: ${{ inputs.plan-storage-tenant-id }}
         PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
         PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
         EVENT_CONTAINER: ${{ inputs.plan-events-container }}

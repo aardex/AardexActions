@@ -41,23 +41,10 @@ inputs:
     required: false
     default: 'tfplan-events'
     description: "Private claim/result container"
-  plan-storage-client-id:
-    required: true
-    description: "Federated plan reader and claim writer client ID"
-  plan-storage-tenant-id:
-    required: true
-    description: "Storage identity tenant ID"
 
 runs:
   using: composite
   steps:
-    - name: Verify environment approval evidence
-      shell: bash
-      env:
-        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
-        GITHUB_API_TOKEN: ${{ github.token }}
-      run: python3 "${{ github.action_path }}/check_approval.py"
-
     - name: Authenticate deployment identity
       shell: bash
       env:
@@ -116,21 +103,10 @@ runs:
         [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
         { echo "version=$version"; echo "root=$root"; } >> "$GITHUB_OUTPUT"
 
-    - name: Authenticate plan reader
-      uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
-      env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-executor-${{ github.run_id }}-${{ github.run_attempt }}
-      with:
-        client-id: ${{ inputs.plan-storage-client-id }}
-        tenant-id: ${{ inputs.plan-storage-tenant-id }}
-        allow-no-subscriptions: true
-
     - name: Verify and claim reviewed plan
       id: acquire
       shell: bash
       env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-executor-${{ github.run_id }}-${{ github.run_attempt }}
-        PLAN_STORAGE_TENANT_ID: ${{ inputs.plan-storage-tenant-id }}
         PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
         PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
         EVENT_CONTAINER: ${{ inputs.plan-events-container }}
@@ -157,23 +133,10 @@ runs:
         [[ "$actual_sha256" == "$EXPECTED_SHA256" ]] || { echo 'Reviewed plan checksum changed before apply.' >&2; exit 1; }
         bash "${{ github.action_path }}/../terraform-deploy/run-terraform.sh" apply terraform apply -input=false -auto-approve "$REVIEWED_PLAN_PATH"
 
-    - name: Authenticate result recorder
-      id: recorder_login
-      if: ${{ always() && steps.acquire.outcome == 'success' }}
-      uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
-      env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-executor-${{ github.run_id }}-${{ github.run_attempt }}
-      with:
-        client-id: ${{ inputs.plan-storage-client-id }}
-        tenant-id: ${{ inputs.plan-storage-tenant-id }}
-        allow-no-subscriptions: true
-
     - name: Record apply result
-      if: ${{ always() && steps.acquire.outcome == 'success' && steps.recorder_login.outcome == 'success' }}
+      if: ${{ always() && steps.acquire.outcome == 'success' }}
       shell: bash
       env:
-        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-executor-${{ github.run_id }}-${{ github.run_attempt }}
-        PLAN_STORAGE_TENANT_ID: ${{ inputs.plan-storage-tenant-id }}
         PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
         PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
         EVENT_CONTAINER: ${{ inputs.plan-events-container }}
