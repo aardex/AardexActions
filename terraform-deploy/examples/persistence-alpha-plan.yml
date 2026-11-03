@@ -1,0 +1,46 @@
+# Reference only: replace ACTION_COMMIT with a reviewed AardexActions commit SHA.
+# Before use, configure the alpha-plan environment and OIDC subject as documented.
+name: Persistence Alpha plan (reference)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: persistence-alpha-terraform
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    environment: alpha-plan
+    runs-on:
+      group: Aardex
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Load existing deployment identity
+        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0 # v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+          AZ_CRED: op://${{ vars.OP_ADMIN_VAULT_NAME }}/${{ vars.AZ_APPR }}/notes
+      - name: Plan and publish
+        id: plan
+        uses: aardex/AardexActions/terraform-deploy@ACTION_COMMIT
+        with:
+          azure-credentials: ${{ env.AZ_CRED }}
+          azure-subscription: ${{ vars.AZ_SUBSCRIPTION_ID }}
+          github-token: ${{ secrets.TF_MODULES_READ_TOKEN }}
+          directory: ${{ vars.TF_DIR }}
+          tfvars-content: ${{ secrets.TFVARS_CONTENT }}
+          apply: 'false'
+          plan-summary-mode: human-readable
+          plan-storage: azure-blob
+          plan-environment: alpha
+          plan-storage-account: ${{ vars.TF_PLAN_STORAGE_ACCOUNT }}
+          plan-storage-client-id: ${{ vars.TF_PLAN_PUBLISH_CLIENT_ID }}
+          plan-storage-tenant-id: ${{ vars.TF_PLAN_STORAGE_TENANT_ID }}

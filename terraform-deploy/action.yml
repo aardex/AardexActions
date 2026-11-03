@@ -31,13 +31,61 @@ inputs:
     required: false
     default: 'counts-only'
     description: "Plan summary: counts-only or human-readable (may expose sensitive data)"
+  plan-storage:
+    required: false
+    default: 'none'
+    description: "none or azure-blob; azure-blob requires apply=false"
+  plan-storage-account:
+    required: false
+    description: "Private Azure Storage account for saved plans"
+  plan-storage-container:
+    required: false
+    default: 'tfplans'
+    description: "Private plan container"
+  plan-events-container:
+    required: false
+    default: 'tfplan-events'
+    description: "Private claim and result container"
+  plan-environment:
+    required: false
+    description: "Target environment name bound to the plan"
+  plan-storage-client-id:
+    required: false
+    description: "Federated create-only plan publisher identity client ID"
+  plan-storage-tenant-id:
+    required: false
+    description: "Tenant ID for the storage identity"
   github-token:
     required: true
     description: "GitHub token for private module access"
 
+outputs:
+  plan-id:
+    description: "Identifier of the uploaded plan, when secure storage is enabled"
+    value: ${{ steps.store.outputs.plan-id }}
+  plan-sha256:
+    description: "SHA-256 of the reviewed and uploaded plan"
+    value: ${{ steps.store.outputs.sha256 }}
+
 runs:
   using: composite
   steps:
+    - name: Validate plan storage mode
+      shell: bash
+      env:
+        STORAGE_MODE: ${{ inputs.plan-storage }}
+        APPLY_INPUT: ${{ inputs.apply }}
+      run: |
+        case "$STORAGE_MODE" in
+          none) ;;
+          azure-blob)
+            if [[ "$APPLY_INPUT" == true ]]; then
+              echo 'Secure storage requires apply=false; use the separate reviewed-apply action.' >&2
+              exit 1
+            fi ;;
+          *) echo 'Unsupported plan storage mode.' >&2; exit 1 ;;
+        esac
+
     - name: Login to Azure
       shell: bash
       run: |
@@ -128,7 +176,32 @@ runs:
 
         bash "${{ github.action_path }}/run-terraform.sh" plan "${CMD[@]}"
 
+    - name: Capture saved plan context
+      id: plan_context
+      if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        EXPECTED_COMMIT: ${{ github.sha }}
+      run: |
+        actual_commit=$(git rev-parse HEAD 2>/dev/null) || exit 1
+        [[ "$actual_commit" == "$EXPECTED_COMMIT" ]] || { echo 'Checkout does not match workflow commit.' >&2; exit 1; }
+        root=$(git rev-parse --show-prefix 2>/dev/null) || exit 1
+        root=${root%/}; root=${root:-.}
+        [[ "$root" =~ ^[A-Za-z0-9_./-]{1,200}$ ]] || exit 1
+        workspace=$(terraform workspace show 2>/dev/null) || exit 1
+        version=$(terraform version -json 2>/dev/null | jq -er .terraform_version) || exit 1
+        [[ "$workspace" =~ ^[A-Za-z0-9_.-]{1,100}$ && "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+        checksum=$(sha256sum tfplan.tfplan | cut -d ' ' -f 1) || exit 1
+        {
+          echo "workspace=$workspace"
+          echo "root=$root"
+          echo "version=$version"
+          echo "checksum=$checksum"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Terraform plan summary
+      id: summary
       if: ${{ always() && steps.plan.outcome != 'skipped' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
@@ -136,6 +209,50 @@ runs:
         PLAN_OUTCOME: ${{ steps.plan.outcome }}
         PLAN_SUMMARY_MODE: ${{ inputs.plan-summary-mode }}
       run: bash "${{ github.action_path }}/summarize-plan.sh"
+
+    - name: Check secure plan review summary
+      if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
+      shell: bash
+      env:
+        COUNTS_READY: ${{ steps.summary.outputs.counts-ready }}
+        HUMAN_READY: ${{ steps.summary.outputs.human-ready }}
+        SUMMARY_MODE: ${{ inputs.plan-summary-mode }}
+      run: |
+        [[ "$COUNTS_READY" == true ]] || { echo 'Plan counts are unavailable; secure publication stopped.' >&2; exit 1; }
+        case "$SUMMARY_MODE" in
+          counts-only) ;;
+          human-readable) [[ "$HUMAN_READY" == true ]] || { echo 'Human-readable summary unavailable; secure publication stopped.' >&2; exit 1; } ;;
+          *) echo 'Unsupported plan summary mode; secure publication stopped.' >&2; exit 1 ;;
+        esac
+
+    - name: Authenticate plan publisher
+      if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
+      uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+      env:
+        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-publisher-${{ github.run_id }}-${{ github.run_attempt }}
+      with:
+        client-id: ${{ inputs.plan-storage-client-id }}
+        tenant-id: ${{ inputs.plan-storage-tenant-id }}
+        allow-no-subscriptions: true
+
+    - name: Store reviewed plan
+      id: store
+      if: ${{ inputs.plan-storage == 'azure-blob' && steps.plan.outcome == 'success' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        AZURE_CONFIG_DIR: ${{ runner.temp }}/tfplan-publisher-${{ github.run_id }}-${{ github.run_attempt }}
+        PLAN_STORAGE_TENANT_ID: ${{ inputs.plan-storage-tenant-id }}
+        PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
+        PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
+        EVENT_CONTAINER: ${{ inputs.plan-events-container }}
+        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
+        PLAN_WORKSPACE: ${{ steps.plan_context.outputs.workspace }}
+        PLAN_ROOT: ${{ steps.plan_context.outputs.root }}
+        PLAN_TERRAFORM_VERSION: ${{ steps.plan_context.outputs.version }}
+        PLAN_SHA256: ${{ steps.plan_context.outputs.checksum }}
+        PLAN_COMMIT: ${{ github.sha }}
+      run: python3 "${{ github.action_path }}/plan_store.py" publish
 
     - name: Terraform Apply (opt-in)
       if: ${{ success() && steps.plan.outcome == 'success' && inputs.apply == 'true' }}

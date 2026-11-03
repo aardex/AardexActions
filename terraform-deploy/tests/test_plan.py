@@ -140,6 +140,34 @@ esac
         self.assertIn('<details>', self.summary.read_text())
         self.assertLess(self.summary.stat().st_size, 1048576)
 
+    def test_readiness_flags_reflect_summary_generation(self):
+        self.write_plan([])
+        outputs = self.root / 'outputs'
+        self.human_payload.write_text('synthetic plan')
+        result = self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable',
+                           SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'), GITHUB_OUTPUT=str(outputs))
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('counts-ready=true', outputs.read_text())
+        self.assertIn('human-ready=true', outputs.read_text())
+        outputs.unlink()
+        self.human_payload.write_text('x' * 180001)
+        result = self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable',
+                           SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'), GITHUB_OUTPUT=str(outputs))
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('counts-ready=true', outputs.read_text())
+        self.assertNotIn('human-ready=true', outputs.read_text())
+
+    def test_failed_summary_write_never_sets_ready_flags(self):
+        self.write_plan([])
+        self.human_payload.write_text('synthetic plan')
+        outputs = self.root / 'outputs'
+        self.summary.mkdir()
+        self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable',
+                  SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'), GITHUB_OUTPUT=str(outputs))
+        if outputs.exists():
+            self.assertNotIn('counts-ready=true', outputs.read_text())
+            self.assertNotIn('human-ready=true', outputs.read_text())
+
     def test_unrecognized_mode_is_not_silently_accepted(self):
         self.write_plan([])
         result = self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable-typo',
@@ -220,6 +248,15 @@ esac
         self.assertNotIn('SECRET', result.stdout + result.stderr)
         self.assertFalse(self.calls.exists())
         self.assertFalse(self.summary.exists())
+
+    def test_secure_storage_opt_in_does_not_change_default_apply(self):
+        validation = run_block('Validate plan storage mode')
+        self.assertEqual(self.bash(validation, STORAGE_MODE='none', APPLY_INPUT='true').returncode, 0)
+        self.assertEqual(self.bash(validation, STORAGE_MODE='azure-blob', APPLY_INPUT='false').returncode, 0)
+        self.assertNotEqual(self.bash(validation, STORAGE_MODE='azure-blob', APPLY_INPUT='true').returncode, 0)
+        self.assertNotEqual(self.bash(validation, STORAGE_MODE='unexpected', APPLY_INPUT='false').returncode, 0)
+        self.assertLess(MANIFEST.index('- name: Capture saved plan context'), MANIFEST.index('- name: Terraform plan summary'))
+        self.assertLess(MANIFEST.index('- name: Terraform plan summary'), MANIFEST.index('- name: Store reviewed plan'))
 
     def test_plan_exit_stale_plan_and_apply_command(self):
         plan = run_block('Terraform Plan')

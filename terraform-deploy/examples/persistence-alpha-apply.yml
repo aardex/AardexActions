@@ -1,0 +1,68 @@
+# Reference only: replace ACTION_COMMIT with a reviewed AardexActions commit SHA.
+# The existing alpha environment currently has NO required reviewers. Configure
+# and verify required reviewers before use; this file does not configure them.
+name: Persistence Alpha reviewed apply (reference)
+on:
+  workflow_dispatch:
+    inputs:
+      plan_id:
+        description: "Exact plan ID copied from the reviewed plan run"
+        required: true
+        type: string
+      plan_sha256:
+        description: "SHA-256 copied from the same reviewed plan run"
+        required: true
+        type: string
+      plan_commit:
+        description: "Full commit SHA copied from the reviewed plan run"
+        required: true
+        type: string
+      workspace:
+        description: "Terraform workspace shown in the plan summary"
+        required: true
+        type: string
+        default: default
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: persistence-alpha-terraform
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    # Required reviewers, no self-review, no admin bypass and trusted branches
+    # must be configured on this environment before the job is dispatched.
+    environment: alpha
+    runs-on:
+      group: Aardex
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.plan_commit }}
+          persist-credentials: false
+      - name: Load existing deployment identity
+        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0 # v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+          AZ_CRED: op://${{ vars.OP_ADMIN_VAULT_NAME }}/${{ vars.AZ_APPR }}/notes
+      - name: Verify, claim and apply reviewed plan
+        uses: aardex/AardexActions/terraform-apply-saved@ACTION_COMMIT
+        with:
+          azure-credentials: ${{ env.AZ_CRED }}
+          azure-subscription: ${{ vars.AZ_SUBSCRIPTION_ID }}
+          github-token: ${{ secrets.TF_MODULES_READ_TOKEN }}
+          directory: ${{ vars.TF_DIR }}
+          plan-id: ${{ inputs.plan_id }}
+          plan-sha256: ${{ inputs.plan_sha256 }}
+          plan-commit: ${{ inputs.plan_commit }}
+          plan-workspace: ${{ inputs.workspace }}
+          plan-environment: alpha
+          plan-storage-account: ${{ vars.TF_PLAN_STORAGE_ACCOUNT }}
+          plan-storage-client-id: ${{ vars.TF_PLAN_APPLY_CLIENT_ID }}
+          plan-storage-tenant-id: ${{ vars.TF_PLAN_STORAGE_TENANT_ID }}

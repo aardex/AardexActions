@@ -33,7 +33,9 @@ if terraform show -json tfplan.tfplan 2>/dev/null | jq -er '
   (["create", "update", "delete", "replace"] | map(. as $kind | "| " + $kind + " | " + ([$actions[] | select(. == $kind)] | length | tostring) + " |") | join("\n")) +
   "\n\nReplacement is counted once, separately from create and delete. Counts exclude addresses, values, outputs, and variables."
 ' > "$summary" 2>/dev/null; then
-  cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+  if cat "$summary" >> "$GITHUB_STEP_SUMMARY"; then
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'counts-ready=true\n' >> "$GITHUB_OUTPUT"; fi
+  fi
 else
   unavailable 'plan could not be summarized'
 fi
@@ -54,11 +56,14 @@ case "${PLAN_SUMMARY_MODE:-counts-only}" in
     elif (( show_status != 0 || size == 0 )); then
       printf '\nHuman-readable plan unavailable. Counts remain available when generated.\n' >> "$GITHUB_STEP_SUMMARY"
     else
-      {
+      if (
+        set -e
         printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n'
         sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$summary"
         printf '\n</code></pre>\n</details>\n'
-      } >> "$GITHUB_STEP_SUMMARY"
+      ) >> "$GITHUB_STEP_SUMMARY"; then
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'human-ready=true\n' >> "$GITHUB_OUTPUT"; fi
+      fi
     fi
     ;;
   *)
