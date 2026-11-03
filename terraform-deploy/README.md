@@ -1,9 +1,10 @@
 # Terraform deploy to Azure
 
-This composite action logs in with an Azure service principal, initializes and validates Terraform, writes a saved plan and optionally applies it. See [deployment and approval boundaries](../docs/deployment.md) and [configuration/data handling](../docs/configuration.md) before running it.
+This composite action supports legacy deploys and an opt-in reviewed plan/apply handoff. See [deployment and approval boundaries](../docs/deployment.md) and [configuration/data handling](../docs/configuration.md) before running it.
 
 | Input | Required | Default / behavior |
 | --- | --- | --- |
+| `execution-mode` | No | `legacy` (default), `reviewed-plan`, or `reviewed-apply` |
 | `azure-credentials` | Yes | Service-principal JSON with `clientId`, `clientSecret`, `tenantId`, `subscriptionId` |
 | `github-token` | Yes | Token with read access to referenced private GitHub modules |
 | `azure-subscription` | No | Overrides `subscriptionId` from credentials |
@@ -17,6 +18,12 @@ This composite action logs in with an Azure service principal, initializes and v
 | `plan-storage-account` | For Blob mode | Private plan-storage account name |
 | `plan-storage-container`, `plan-events-container` | No | `tfplans` and `tfplan-events` respectively |
 | `plan-environment` | For Blob mode | Target environment bound into plan metadata and identifier |
+| `plan-id`, `plan-sha256`, `plan-commit` | For reviewed apply | Values copied from the reviewed plan summary |
+| `plan-workspace` | For reviewed apply | Workspace from the reviewed summary; default `default` |
+
+`legacy` preserves existing plan and same-job optional apply behavior, including the existing Blob opt-in. `reviewed-plan` requires `apply: 'false'`, `plan-storage: azure-blob`, `plan-summary-mode: human-readable`, a storage account and environment; it never applies. `reviewed-apply` requires `apply: 'false'`, storage settings and all four reviewed-plan values. It runs only the saved-plan action and does not generate a plan; `plan-storage` can be its default `none` or `azure-blob`. Unsupported or conflicting values fail before Azure login. An independently selected checkout at `plan-commit` is required.
+
+The unified action delegates reviewed apply to the existing `terraform-apply-saved` implementation pinned at `b6bc7e2c72f868102908b454223a4157f2dd7689`. This preserves the existing Blob/claim contract without a second apply implementation. Maintain this pin when reviewing changes to the saved-apply implementation. The plan outputs include `plan-id`, `plan-sha256`, `plan-commit`, `plan-workspace`, and `plan-root`; the job summary also identifies the Terraform version.
 
 Uses Terraform 1.13.3, runs `terraform init -upgrade -input=false`, `terraform validate -no-color`, then saves `tfplan.tfplan`. The binary plan and captured Terraform output (`init-result.txt`, `validate-result.txt`, `result.txt` and `apply-result.txt`) remain on the runner and are not uploaded by this action. `terraform show -json` is streamed directly into a filter. By default the job summary contains only fixed action categories and aggregate resource counts; replacements count once, separately from creates and deletes. The counts omit addresses, resource types, indices, values, outputs and variables. Unsupported action combinations, an invalid or missing plan, or a failed plan produce a generic unavailable message instead. The plan's exit status controls the step; apply runs only after a successful plan and preceding steps. The action no longer explicitly echoes plan arguments. Azure login and other consumer steps can still produce logs that require access controls and review. Do not put secrets or variable values in `plan-args`: GitHub Actions may expose step environment values; use the protected `tfvars-content` input instead.
 

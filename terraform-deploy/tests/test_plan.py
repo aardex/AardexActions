@@ -250,13 +250,44 @@ esac
         self.assertFalse(self.summary.exists())
 
     def test_secure_storage_opt_in_does_not_change_default_apply(self):
-        validation = run_block('Validate plan storage mode')
-        self.assertEqual(self.bash(validation, STORAGE_MODE='none', APPLY_INPUT='true').returncode, 0)
-        self.assertEqual(self.bash(validation, STORAGE_MODE='azure-blob', APPLY_INPUT='false').returncode, 0)
-        self.assertNotEqual(self.bash(validation, STORAGE_MODE='azure-blob', APPLY_INPUT='true').returncode, 0)
-        self.assertNotEqual(self.bash(validation, STORAGE_MODE='unexpected', APPLY_INPUT='false').returncode, 0)
+        validation = run_block('Validate execution mode')
+        legacy = dict(EXECUTION_MODE='legacy', STORAGE_MODE='none', APPLY_INPUT='false')
+        self.assertEqual(self.bash(validation, **legacy).returncode, 0)
+        self.assertEqual(self.bash(validation, **{**legacy, 'APPLY_INPUT': 'true'}).returncode, 0)
+        self.assertEqual(self.bash(validation, **{**legacy, 'STORAGE_MODE': 'azure-blob'}).returncode, 0)
+        self.assertNotEqual(self.bash(validation, **{**legacy, 'STORAGE_MODE': 'azure-blob', 'APPLY_INPUT': 'true'}).returncode, 0)
+        self.assertNotEqual(self.bash(validation, **{**legacy, 'STORAGE_MODE': 'unexpected'}).returncode, 0)
         self.assertLess(MANIFEST.index('- name: Capture saved plan context'), MANIFEST.index('- name: Terraform plan summary'))
         self.assertLess(MANIFEST.index('- name: Terraform plan summary'), MANIFEST.index('- name: Store reviewed plan'))
+
+    def test_reviewed_mode_input_validation_fails_closed(self):
+        validation = run_block('Validate execution mode')
+        base = dict(EXECUTION_MODE='reviewed-plan', STORAGE_MODE='azure-blob', APPLY_INPUT='false',
+                    SUMMARY_MODE='human-readable', STORAGE_ACCOUNT='fixtureaccount', PLAN_CONTAINER='tfplans',
+                    EVENT_CONTAINER='tfplan-events', PLAN_ENVIRONMENT='alpha',
+                    PLAN_ID='synthetic-id', PLAN_SHA256='a' * 64, PLAN_COMMIT='b' * 40, PLAN_WORKSPACE='default')
+        self.assertEqual(self.bash(validation, **base).returncode, 0)
+        for updates in ({'EXECUTION_MODE': 'unknown'}, {'APPLY_INPUT': 'true'}, {'STORAGE_MODE': 'none'},
+                        {'SUMMARY_MODE': 'counts-only'}, {'STORAGE_ACCOUNT': ''}, {'PLAN_CONTAINER': ''},
+                        {'EVENT_CONTAINER': ''}, {'PLAN_ENVIRONMENT': ''}):
+            with self.subTest(updates=updates):
+                self.assertNotEqual(self.bash(validation, **{**base, **updates}).returncode, 0)
+        reviewed_apply = {**base, 'EXECUTION_MODE': 'reviewed-apply', 'STORAGE_MODE': 'none'}
+        self.assertEqual(self.bash(validation, **reviewed_apply).returncode, 0)
+        self.assertEqual(self.bash(validation, **{**reviewed_apply, 'STORAGE_MODE': 'azure-blob'}).returncode, 0)
+        for field in ('STORAGE_ACCOUNT', 'PLAN_CONTAINER', 'EVENT_CONTAINER', 'PLAN_ENVIRONMENT',
+                      'PLAN_ID', 'PLAN_SHA256', 'PLAN_COMMIT', 'PLAN_WORKSPACE'):
+            with self.subTest(field=field):
+                self.assertNotEqual(self.bash(validation, **{**reviewed_apply, field: ''}).returncode, 0)
+        self.assertNotEqual(self.bash(validation, **{**reviewed_apply, 'APPLY_INPUT': 'true'}).returncode, 0)
+
+    def test_reviewed_apply_delegates_without_plan_or_legacy_apply(self):
+        self.assertIn("default: 'legacy'", MANIFEST)
+        for name in ('Terraform Init', 'Terraform Validate', 'Terraform Plan'):
+            step = MANIFEST.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
+            self.assertIn("inputs.execution-mode != 'reviewed-apply'", step)
+        self.assertIn("inputs.execution-mode == 'legacy' && steps.plan.outcome", MANIFEST)
+        self.assertIn('terraform-apply-saved@b6bc7e2c72f868102908b454223a4157f2dd7689', MANIFEST)
 
     def test_plan_exit_stale_plan_and_apply_command(self):
         plan = run_block('Terraform Plan')

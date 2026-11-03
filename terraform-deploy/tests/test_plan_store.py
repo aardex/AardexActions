@@ -90,6 +90,61 @@ class SecurePlanTests(unittest.TestCase):
             store_module.record(self.blobs, self.env)
         self.assertIn(('tfplans', plan_id + '.tfplan'), self.blobs.items)
 
+    def test_previous_revision_plan_is_consumed_without_format_changes(self):
+        # Load the real prior publisher; fake bytes and in-memory Blob storage only.
+        source = subprocess.run(
+            ['git', 'show', 'b6bc7e2c72f868102908b454223a4157f2dd7689:terraform-deploy/plan_store.py'],
+            cwd=ACTION, check=True, capture_output=True, text=True).stdout
+        previous = {'__name__': 'previous_plan_store'}
+        exec(compile(source, 'previous_plan_store.py', 'exec'), previous)
+        self.env.update(PLAN_ROOT='terraform/environments/alpha',
+                        PLAN_COMMIT='e2e7786949c97c5d10629ab30ce7b839d75f852b',
+                        GITHUB_RUN_ID='41644050622')
+        plan_id = ('aardex/PersistenceComponent/alpha/41644050622/1/'
+                   '285ccf5e-c20b-4ac8-8dad-899fbaaca667')
+        published, digest = previous['publish'](self.blobs, self.env, self.plan, plan_id=plan_id)
+        self.assertEqual((published, digest), (plan_id, self.sha))
+        self.env['PLAN_ID'] = plan_id
+        _, path, _ = store_module.acquire(self.blobs, self.env, self.dir)
+        self.assertEqual(Path(path).read_bytes(), self.payload)
+        self.assertIn(('tfplan-events', plan_id + '.claim'), self.blobs.items)
+        with self.assertRaises(store_module.PlanError):
+            store_module.acquire(self.blobs, self.env, self.dir)
+
+    def test_reviewed_checkout_is_verified_before_initialization(self):
+        action = (ACTION.parent / 'terraform-apply-saved/action.yml').read_text()
+        step = action.split('    - name: Verify checkout and initialize\n', 1)[1].split('\n    - name:', 1)[0]
+        script = textwrap.dedent(step.split('      run: |\n', 1)[1]).replace(
+            '${{ github.action_path }}', '$ACTION_APPLY_PATH')
+        bindir = self.dir / 'bin'
+        bindir.mkdir()
+        git = bindir / 'git'
+        git.write_text('#!/usr/bin/env bash\ncase "$2" in HEAD) echo "$FAKE_COMMIT";; --show-prefix) echo terraform/environments/alpha/;; *) exit 1;; esac\n')
+        git.chmod(0o755)
+        terraform = bindir / 'terraform'
+        terraform.write_text('''#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$CALLS"
+case "$1 $2" in
+  'workspace show') echo default ;;
+  'version -json') echo '{"terraform_version":"1.13.3"}' ;;
+esac
+''')
+        terraform.chmod(0o755)
+        env = dict(os.environ, PATH=str(bindir) + os.pathsep + os.environ['PATH'],
+                   ACTION_APPLY_PATH=str(ACTION.parent / 'terraform-apply-saved'),
+                   EXPECTED_COMMIT='a' * 40, FAKE_COMMIT='b' * 40, EXPECTED_WORKSPACE='default',
+                   GITHUB_OUTPUT=str(self.dir / 'outputs'), CALLS=str(self.dir / 'calls'))
+        result = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script], cwd=self.dir,
+                                env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.dir / 'calls').exists())
+        env['FAKE_COMMIT'] = env['EXPECTED_COMMIT']
+        result = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', script], cwd=self.dir,
+                                env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('init -upgrade -input=false', (self.dir / 'calls').read_text())
+        self.assertIn('root=terraform/environments/alpha', (self.dir / 'outputs').read_text())
+
     def test_publish_outputs_only_nonsecret_identifier_and_hash(self):
         summary = self.dir / 'summary'
         outputs = self.dir / 'outputs'

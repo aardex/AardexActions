@@ -2,6 +2,10 @@ name: terraform-deploy
 description: Deploy Terraform to Azure
 
 inputs:
+  execution-mode:
+    required: false
+    default: 'legacy'
+    description: "legacy, reviewed-plan or reviewed-apply"
   azure-credentials:
     required: true
     description: "Azure credentials for authentication"
@@ -49,6 +53,19 @@ inputs:
   plan-environment:
     required: false
     description: "Target environment name bound to the plan"
+  plan-id:
+    required: false
+    description: "Identifier from the reviewed plan"
+  plan-sha256:
+    required: false
+    description: "SHA-256 copied from the reviewed plan summary"
+  plan-commit:
+    required: false
+    description: "Full commit SHA from the reviewed plan"
+  plan-workspace:
+    required: false
+    default: 'default'
+    description: "Terraform workspace from the reviewed plan"
   github-token:
     required: true
     description: "GitHub token for private module access"
@@ -60,27 +77,61 @@ outputs:
   plan-sha256:
     description: "SHA-256 of the reviewed and uploaded plan"
     value: ${{ steps.store.outputs.sha256 }}
+  plan-commit:
+    description: "Commit used to create the reviewed plan"
+    value: ${{ steps.plan_context.outputs.commit }}
+  plan-workspace:
+    description: "Terraform workspace used for the reviewed plan"
+    value: ${{ steps.plan_context.outputs.workspace }}
+  plan-root:
+    description: "Terraform root used for the reviewed plan"
+    value: ${{ steps.plan_context.outputs.root }}
 
 runs:
   using: composite
   steps:
-    - name: Validate plan storage mode
+    - name: Validate execution mode
       shell: bash
       env:
+        EXECUTION_MODE: ${{ inputs.execution-mode }}
         STORAGE_MODE: ${{ inputs.plan-storage }}
         APPLY_INPUT: ${{ inputs.apply }}
+        SUMMARY_MODE: ${{ inputs.plan-summary-mode }}
+        STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
+        PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
+        EVENT_CONTAINER: ${{ inputs.plan-events-container }}
+        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
+        PLAN_ID: ${{ inputs.plan-id }}
+        PLAN_SHA256: ${{ inputs.plan-sha256 }}
+        PLAN_COMMIT: ${{ inputs.plan-commit }}
+        PLAN_WORKSPACE: ${{ inputs.plan-workspace }}
       run: |
         case "$STORAGE_MODE" in
-          none) ;;
-          azure-blob)
-            if [[ "$APPLY_INPUT" == true ]]; then
-              echo 'Secure storage requires apply=false; use the separate reviewed-apply action.' >&2
-              exit 1
-            fi ;;
+          none|azure-blob) ;;
           *) echo 'Unsupported plan storage mode.' >&2; exit 1 ;;
+        esac
+        case "$EXECUTION_MODE" in
+          legacy)
+            if [[ "$STORAGE_MODE" == azure-blob && "$APPLY_INPUT" == true ]]; then
+              echo 'Secure storage requires apply=false; use reviewed-apply.' >&2; exit 1
+            fi ;;
+          reviewed-plan)
+            [[ "$APPLY_INPUT" == false && "$STORAGE_MODE" == azure-blob && "$SUMMARY_MODE" == human-readable ]] || {
+              echo 'reviewed-plan requires apply=false, azure-blob storage and a human-readable summary.' >&2; exit 1;
+            }
+            [[ -n "$STORAGE_ACCOUNT" && -n "$PLAN_CONTAINER" && -n "$EVENT_CONTAINER" && -n "$PLAN_ENVIRONMENT" ]] || {
+              echo 'Reviewed modes require a storage account and plan environment.' >&2; exit 1;
+            } ;;
+          reviewed-apply)
+            [[ "$APPLY_INPUT" == false ]] || { echo 'reviewed-apply requires apply=false.' >&2; exit 1; }
+            [[ -n "$STORAGE_ACCOUNT" && -n "$PLAN_CONTAINER" && -n "$EVENT_CONTAINER" && -n "$PLAN_ENVIRONMENT" && -n "$PLAN_ID" && -n "$PLAN_SHA256" && -n "$PLAN_COMMIT" && -n "$PLAN_WORKSPACE" ]] || {
+              echo 'reviewed-apply requires storage, environment and reviewed plan identifiers.' >&2; exit 1;
+            } ;;
+          *) echo 'Unsupported execution mode.' >&2; exit 1 ;;
         esac
 
     - name: Login to Azure
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       shell: bash
       run: |
         CLIENT_ID=$(echo '${{ inputs.azure-credentials }}' | jq -r .clientId)
@@ -95,12 +146,14 @@ runs:
         az account set --subscription "$SUBSCRIPTION_ID"
 
     - name: Setup Terraform
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: 1.13.3
         terraform_wrapper: false
 
     - name: Configure Git credential URL
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       shell: bash
       env:
         PRIVATE_MODULES_GITHUB_TOKEN: ${{ inputs.github-token }}
@@ -122,7 +175,7 @@ runs:
         git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
     - name: Create terraform.tfvars from input
-      if: ${{ inputs.tfvars-content && inputs.tfvars-content != '' }}
+      if: ${{ inputs.execution-mode != 'reviewed-apply' && inputs.tfvars-content && inputs.tfvars-content != '' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       env:
@@ -136,17 +189,20 @@ runs:
         echo "✅ terraform.tfvars created successfully"
 
     - name: Terraform Init
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: bash "${{ github.action_path }}/run-terraform.sh" init terraform init -upgrade -input=false
 
     - name: Terraform Validate
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: bash "${{ github.action_path }}/run-terraform.sh" validate terraform validate -no-color
 
     - name: Terraform Plan
       id: plan
+      if: ${{ inputs.execution-mode != 'reviewed-apply' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       env:
@@ -189,6 +245,7 @@ runs:
         checksum=$(sha256sum tfplan.tfplan | cut -d ' ' -f 1) || exit 1
         {
           echo "workspace=$workspace"
+          echo "commit=$actual_commit"
           echo "root=$root"
           echo "version=$version"
           echo "checksum=$checksum"
@@ -237,7 +294,26 @@ runs:
       run: python3 "${{ github.action_path }}/plan_store.py" publish
 
     - name: Terraform Apply (opt-in)
-      if: ${{ success() && steps.plan.outcome == 'success' && inputs.apply == 'true' }}
+      if: ${{ success() && inputs.execution-mode == 'legacy' && steps.plan.outcome == 'success' && inputs.apply == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: bash "${{ github.action_path }}/run-terraform.sh" apply terraform apply -input=false -auto-approve tfplan.tfplan
+
+    # Composite actions cannot refer to a sibling in their own checkout with a
+    # relative uses path. Pin the existing implementation and its storage format.
+    - name: Apply reviewed saved plan
+      if: ${{ inputs.execution-mode == 'reviewed-apply' }}
+      uses: aardex/AardexActions/terraform-apply-saved@b6bc7e2c72f868102908b454223a4157f2dd7689
+      with:
+        azure-credentials: ${{ inputs.azure-credentials }}
+        azure-subscription: ${{ inputs.azure-subscription }}
+        github-token: ${{ inputs.github-token }}
+        directory: ${{ inputs.directory }}
+        plan-id: ${{ inputs.plan-id }}
+        plan-sha256: ${{ inputs.plan-sha256 }}
+        plan-commit: ${{ inputs.plan-commit }}
+        plan-workspace: ${{ inputs.plan-workspace }}
+        plan-environment: ${{ inputs.plan-environment }}
+        plan-storage-account: ${{ inputs.plan-storage-account }}
+        plan-storage-container: ${{ inputs.plan-storage-container }}
+        plan-events-container: ${{ inputs.plan-events-container }}
