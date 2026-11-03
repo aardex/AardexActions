@@ -14,6 +14,7 @@ This composite action supports legacy deploys and an opt-in reviewed plan/apply 
 | `tfvars-content` | No | Writes `terraform.tfvars` in `directory` when nonempty |
 | `plan-args` | No | Additional whitespace-split flags for `terraform plan` |
 | `plan-summary-mode` | No | `counts-only` (default); opt in to `human-readable` only after assessing plan visibility and exposure |
+| `apply-summary-mode` | No | `counts-only` (default); opt in to `human-readable` only after assessing apply output exposure |
 | `plan-storage` | No | `none` (default); `azure-blob` stores a plan for reviewed apply and requires `apply: 'false'` |
 | `plan-storage-account` | For Blob mode | Private plan-storage account name |
 | `plan-storage-container`, `plan-events-container` | No | `tfplans` and `tfplan-events` respectively |
@@ -33,6 +34,12 @@ Set `plan-summary-mode: 'human-readable'` to add `terraform show -no-color tfpla
 The summary appears on the workflow run page, not behind an additional per-secret access boundary. Verify the consumer repository's effective reader and integration access and retention rules; environment approvals do not create a separate confidentiality boundary for the summary. GitHub documents that summaries automatically mask known secrets, but [redaction is not guaranteed](https://docs.github.com/en/actions/reference/security/secure-use), especially for structured, transformed, generated or unregistered values. Do not rely on it to make a plan safe. If sensitive information is published, follow the incident process: [delete the workflow run](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary) to remove its summaries and rotate exposed credentials as appropriate.
 
 GitHub limits a [step summary to 1 MiB](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-job-summary); an upload failure does not fail the job. To preserve the count summary, this action omits the human-readable section when the plan text exceeds 180000 bytes or cannot be rendered, and displays a fixed notice. It buffers at most 180001 bytes in a private runner-local temporary file and removes it on normal exit; the Markdown is escaped before publication. Runner termination may leave temporary files on persistent runners. The limit is conservative to account for HTML escaping. Unknown modes produce a warning and only the counts; secure Blob publication fails for an unsupported mode or unavailable required summary. No saved plan, JSON plan or full captured CLI-output artifact is uploaded by this action.
+
+### Apply results and diagnostics
+
+Both legacy and reviewed apply use the same summary renderer. After a successful or failed apply it reports the status, process exit code and available environment, checked-out commit and plan ID. The default `counts-only` mode also reports Terraform's resource counts when available, without publishing captured output. `human-readable` additionally publishes an HTML-escaped excerpt of the last 180000 bytes of captured apply output in a collapsible section; long output is marked as truncated. Raw output is not uploaded as an artifact or stored in Blob. Summary rendering is best effort and never changes the Terraform exit status; if the apply never started or captured output is unavailable, no stale output is shown.
+
+**Human-readable apply output can contain secrets or other sensitive values Terraform and GitHub do not mask.** Enable it only when everyone who can view the workflow run is authorized to see that output, and apply the same access and retention review as for human-readable plans. Runner termination can prevent summary or cleanup steps from running. An apply failure can leave partial changes; inspect the target and state before any retry.
 
 ### Secure saved-plan handoff
 

@@ -35,6 +35,10 @@ inputs:
     required: false
     default: 'counts-only'
     description: "Plan summary: counts-only or human-readable (may expose sensitive data)"
+  apply-summary-mode:
+    required: false
+    default: 'counts-only'
+    description: "Apply summary: counts-only or human-readable (may expose sensitive data)"
   plan-storage:
     required: false
     default: 'none'
@@ -281,10 +285,26 @@ runs:
       run: python3 "${{ github.action_path }}/plan_store.py" publish
 
     - name: Terraform Apply (opt-in)
+      id: apply_plan
       if: ${{ success() && inputs.execution-mode == 'legacy' && steps.plan.outcome == 'success' && inputs.apply == 'true' }}
       shell: bash
       working-directory: ${{ inputs.directory }}
       run: bash "${{ github.action_path }}/run-terraform.sh" apply terraform apply -input=false -auto-approve tfplan.tfplan
+
+    - name: Summarize Terraform apply
+      if: ${{ always() && steps.apply_plan.outcome != 'skipped' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        APPLY_OUTCOME: ${{ steps.apply_plan.outcome }}
+        APPLY_EXIT_CODE: ${{ steps.apply_plan.outputs.exit-code }}
+        APPLY_OUTPUT_READY: ${{ steps.apply_plan.outputs.output-ready }}
+        APPLY_SUMMARY_MODE: ${{ inputs.apply-summary-mode }}
+        APPLY_ENVIRONMENT: ${{ inputs.plan-environment }}
+        APPLY_PLAN_ID: ${{ inputs.plan-id }}
+      run: |
+        export APPLY_COMMIT="$(git rev-parse HEAD 2>/dev/null || :)"
+        python3 "${{ github.action_path }}/summarize-apply.py" 2>/dev/null || echo '::warning::Terraform apply summary unavailable.'
 
     - name: Authenticate for reviewed plan lookup
       if: ${{ inputs.execution-mode == 'reviewed-apply' }}

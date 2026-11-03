@@ -41,6 +41,10 @@ inputs:
     required: false
     default: 'tfplan-events'
     description: "Private claim/result container"
+  apply-summary-mode:
+    required: false
+    default: 'counts-only'
+    description: "Apply summary: counts-only or human-readable (may expose sensitive data)"
 
 runs:
   using: composite
@@ -148,6 +152,21 @@ runs:
         PLAN_ID: ${{ inputs.plan-id }}
         APPLY_STATUS: ${{ steps.apply_plan.outcome == 'success' && 'success' || 'failed' }}
       run: python3 "${{ github.action_path }}/../terraform-deploy/plan_store.py" record
+
+    - name: Summarize Terraform apply
+      if: ${{ always() && steps.apply_plan.outcome != 'skipped' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        APPLY_OUTCOME: ${{ steps.apply_plan.outcome }}
+        APPLY_EXIT_CODE: ${{ steps.apply_plan.outputs.exit-code }}
+        APPLY_OUTPUT_READY: ${{ steps.apply_plan.outputs.output-ready }}
+        APPLY_SUMMARY_MODE: ${{ inputs.apply-summary-mode }}
+        APPLY_ENVIRONMENT: ${{ inputs.plan-environment }}
+        APPLY_COMMIT: ${{ inputs.plan-commit }}
+        APPLY_PLAN_ID: ${{ inputs.plan-id }}
+      run: |
+        python3 "${{ github.action_path }}/../terraform-deploy/summarize-apply.py" 2>/dev/null || echo '::warning::Terraform apply summary unavailable.'
 
     - name: Remove local reviewed plan
       if: ${{ always() && steps.acquire.outcome == 'success' }}

@@ -20,14 +20,24 @@ esac
 shift
 umask 077
 # Replace any prior captured output so an existing file cannot retain permissive modes.
+output_ready=false
 if rm -f -- "$output" 2>/dev/null; then
+  output_ready=true
   if "$@" > "$output" 2>&1; then
-    exit 0
+    status=0
   else
     status=$?
   fi
 else
   status=$?
+fi
+
+# Expose only the numeric apply status; output writes must not change it.
+if [[ "$stage" == apply && -n "${GITHUB_OUTPUT:-}" ]]; then
+  { printf 'exit-code=%s\noutput-ready=%s\n' "$status" "$output_ready" >> "$GITHUB_OUTPUT"; } 2>/dev/null || :
+fi
+if [[ "$status" == 0 ]]; then
+  exit 0
 fi
 
 printf '::error::Terraform %s failed (exit status %d). %s See terraform-deploy README: Failure diagnostics.\n' "$stage" "$status" "$advice"
