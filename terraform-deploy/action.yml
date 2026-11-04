@@ -337,7 +337,7 @@ runs:
       uses: actions/checkout@v6
       with:
         ref: ${{ steps.reviewed_plan.outputs.commit }}
-        token: ${{ inputs.github-token }}
+        token: ${{ github.token }}
         clean: false
         persist-credentials: false
 
