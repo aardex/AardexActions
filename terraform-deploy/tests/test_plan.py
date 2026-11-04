@@ -157,6 +157,20 @@ esac
         self.assertIn('counts-ready=true', outputs.read_text())
         self.assertNotIn('human-ready=true', outputs.read_text())
 
+    def test_failed_human_renderer_does_not_set_ready_flag(self):
+        self.write_plan([])
+        self.human_payload.write_text('synthetic plan')
+        outputs = self.root / 'outputs'
+        renderer = self.root / 'bin/sed'
+        renderer.write_text('#!/usr/bin/env bash\nprintf partial\nexit 1\n')
+        renderer.chmod(0o755)
+        result = self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable',
+                           SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'), GITHUB_OUTPUT=str(outputs))
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('counts-ready=true', outputs.read_text())
+        self.assertNotIn('human-ready=true', outputs.read_text())
+        self.assertNotIn('</details>', self.summary.read_text())
+
     def test_failed_summary_write_never_sets_ready_flags(self):
         self.write_plan([])
         self.human_payload.write_text('synthetic plan')
