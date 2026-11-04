@@ -1,0 +1,176 @@
+name: terraform-apply-saved
+description: Apply an independently reviewed, single-use Azure Blob Terraform plan
+
+inputs:
+  azure-credentials:
+    required: true
+    description: "Existing deployment service-principal credentials"
+  azure-subscription:
+    required: false
+    description: "Deployment subscription override"
+  github-token:
+    required: true
+    description: "Read token for private Terraform modules"
+  directory:
+    required: false
+    default: 'terraform'
+    description: "Terraform root checked out at the reviewed commit"
+  plan-id:
+    required: true
+    description: "Identifier emitted by the reviewed plan run"
+  plan-sha256:
+    required: true
+    description: "SHA-256 independently copied from the reviewed plan run"
+  plan-commit:
+    required: true
+    description: "Full checked-out commit SHA from the reviewed plan run"
+  plan-environment:
+    required: true
+    description: "Approved target environment"
+  plan-workspace:
+    required: true
+    description: "Terraform workspace from the reviewed plan"
+  plan-storage-account:
+    required: true
+    description: "Private Azure Storage account"
+  plan-storage-container:
+    required: false
+    default: 'tfplans'
+    description: "Private plan container"
+  plan-events-container:
+    required: false
+    default: 'tfplan-events'
+    description: "Private claim/result container"
+  apply-summary-mode:
+    required: false
+    default: 'counts-only'
+    description: "Apply summary: counts-only or human-readable (may expose sensitive data)"
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate deployment identity
+      shell: bash
+      env:
+        AZURE_CREDENTIALS: ${{ inputs.azure-credentials }}
+        AZURE_SUBSCRIPTION: ${{ inputs.azure-subscription }}
+      run: |
+        client_id=$(jq -er .clientId <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        client_secret=$(jq -er .clientSecret <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        tenant_id=$(jq -er .tenantId <<< "$AZURE_CREDENTIALS" 2>/dev/null) || exit 1
+        subscription_id=${AZURE_SUBSCRIPTION:-$(jq -er .subscriptionId <<< "$AZURE_CREDENTIALS" 2>/dev/null)}
+        az login --service-principal -u "$client_id" -p "$client_secret" --tenant "$tenant_id" --output none >/dev/null 2>&1
+        az account set --subscription "$subscription_id"
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.13.3
+        terraform_wrapper: false
+
+    - name: Configure private module access
+      shell: bash
+      env:
+        PRIVATE_MODULES_GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        [[ -n "$PRIVATE_MODULES_GITHUB_TOKEN" ]] || exit 1
+        echo "::add-mask::$PRIVATE_MODULES_GITHUB_TOKEN"
+        {
+          echo "PRIVATE_MODULES_GITHUB_TOKEN=$PRIVATE_MODULES_GITHUB_TOKEN"
+          echo "GIT_TERMINAL_PROMPT=0"
+        } >> "$GITHUB_ENV"
+        git config --global credential.https://github.com.username x-access-token
+        git config --global credential.https://github.com.helper '!f() { test "$1" = get && echo username=x-access-token && echo "password=$PRIVATE_MODULES_GITHUB_TOKEN"; }; f'
+        git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+        git config --global --add url."https://github.com/".insteadOf "git@github.com:"
+
+    - name: Verify checkout and initialize
+      id: context
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        EXPECTED_COMMIT: ${{ inputs.plan-commit }}
+        EXPECTED_WORKSPACE: ${{ inputs.plan-workspace }}
+      run: |
+        umask 077
+        [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ && "$EXPECTED_WORKSPACE" =~ ^[A-Za-z0-9_.-]{1,100}$ ]] || exit 1
+        actual_commit=$(git rev-parse HEAD 2>/dev/null) || exit 1
+        root=$(git rev-parse --show-prefix 2>/dev/null) || exit 1
+        root=${root%/}; root=${root:-.}
+        [[ "$root" =~ ^[A-Za-z0-9_./-]{1,200}$ ]] || exit 1
+        [[ "$actual_commit" == "$EXPECTED_COMMIT" ]] || { echo 'Checkout does not match the reviewed commit.' >&2; exit 1; }
+        bash "${{ github.action_path }}/../terraform-deploy/run-terraform.sh" init terraform init -upgrade -input=false
+        terraform workspace select "$EXPECTED_WORKSPACE" > workspace-result.txt 2>&1 || { echo 'Terraform workspace selection failed.' >&2; exit 1; }
+        actual_workspace=$(terraform workspace show 2>/dev/null) || exit 1
+        [[ "$actual_workspace" == "$EXPECTED_WORKSPACE" ]] || exit 1
+        version=$(terraform version -json 2>/dev/null | jq -er .terraform_version) || exit 1
+        [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+        { echo "version=$version"; echo "root=$root"; } >> "$GITHUB_OUTPUT"
+
+    - name: Verify and claim reviewed plan
+      id: acquire
+      shell: bash
+      env:
+        PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
+        PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
+        EVENT_CONTAINER: ${{ inputs.plan-events-container }}
+        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
+        PLAN_WORKSPACE: ${{ inputs.plan-workspace }}
+        PLAN_ROOT: ${{ steps.context.outputs.root }}
+        PLAN_TERRAFORM_VERSION: ${{ steps.context.outputs.version }}
+        PLAN_COMMIT: ${{ inputs.plan-commit }}
+        PLAN_ID: ${{ inputs.plan-id }}
+        PLAN_SHA256: ${{ inputs.plan-sha256 }}
+      run: python3 "${{ github.action_path }}/../terraform-deploy/plan_store.py" acquire
+
+    - name: Apply reviewed plan
+      id: apply_plan
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        REVIEWED_PLAN_PATH: ${{ steps.acquire.outputs.plan-path }}
+        EXPECTED_SHA256: ${{ inputs.plan-sha256 }}
+        PLAN_EXPIRES_AT: ${{ steps.acquire.outputs.expires-at }}
+      run: |
+        [[ "$PLAN_EXPIRES_AT" =~ ^[0-9]+$ ]] && (( $(date -u +%s) < PLAN_EXPIRES_AT )) || { echo 'Reviewed plan has expired.' >&2; exit 1; }
+        actual_sha256=$(sha256sum "$REVIEWED_PLAN_PATH" | cut -d ' ' -f 1) || exit 1
+        [[ "$actual_sha256" == "$EXPECTED_SHA256" ]] || { echo 'Reviewed plan checksum changed before apply.' >&2; exit 1; }
+        bash "${{ github.action_path }}/../terraform-deploy/run-terraform.sh" apply terraform apply -input=false -auto-approve "$REVIEWED_PLAN_PATH"
+
+    - name: Record apply result
+      if: ${{ always() && steps.acquire.outcome == 'success' }}
+      shell: bash
+      env:
+        PLAN_STORAGE_ACCOUNT: ${{ inputs.plan-storage-account }}
+        PLAN_CONTAINER: ${{ inputs.plan-storage-container }}
+        EVENT_CONTAINER: ${{ inputs.plan-events-container }}
+        PLAN_ENVIRONMENT: ${{ inputs.plan-environment }}
+        PLAN_WORKSPACE: ${{ inputs.plan-workspace }}
+        PLAN_ROOT: ${{ steps.context.outputs.root }}
+        PLAN_TERRAFORM_VERSION: ${{ steps.context.outputs.version }}
+        PLAN_COMMIT: ${{ inputs.plan-commit }}
+        PLAN_ID: ${{ inputs.plan-id }}
+        APPLY_STATUS: ${{ steps.apply_plan.outcome == 'success' && 'success' || 'failed' }}
+      run: python3 "${{ github.action_path }}/../terraform-deploy/plan_store.py" record
+
+    - name: Summarize Terraform apply
+      if: ${{ always() && steps.apply_plan.outcome != 'skipped' }}
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      env:
+        APPLY_OUTCOME: ${{ steps.apply_plan.outcome }}
+        APPLY_EXIT_CODE: ${{ steps.apply_plan.outputs.exit-code }}
+        APPLY_OUTPUT_READY: ${{ steps.apply_plan.outputs.output-ready }}
+        APPLY_SUMMARY_MODE: ${{ inputs.apply-summary-mode }}
+        APPLY_ENVIRONMENT: ${{ inputs.plan-environment }}
+        APPLY_COMMIT: ${{ inputs.plan-commit }}
+        APPLY_PLAN_ID: ${{ inputs.plan-id }}
+      run: |
+        python3 "${{ github.action_path }}/../terraform-deploy/summarize-apply.py" 2>/dev/null || echo '::warning::Terraform apply summary unavailable.'
+
+    - name: Remove local reviewed plan
+      if: ${{ always() && steps.acquire.outcome == 'success' }}
+      shell: bash
+      env:
+        REVIEWED_PLAN_PATH: ${{ steps.acquire.outputs.plan-path }}
+      run: rm -f -- "$REVIEWED_PLAN_PATH"

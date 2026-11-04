@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Only fixed labels and integer counts may leave this process.
+# Default output contains only fixed labels and counts; human-readable mode is opt-in.
 set -o pipefail
 
 unavailable() {
-  printf '### Terraform plan\n\nSanitized overview unavailable (%s). No plan details were published.\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+  printf '### Terraform plan\n\nSanitized overview unavailable (%s). No aggregate counts were published.\n' "$1" >> "$GITHUB_STEP_SUMMARY"
 }
 
 if [[ "${PLAN_OUTCOME:-}" != success ]]; then
@@ -31,9 +31,42 @@ if terraform show -json tfplan.tfplan 2>/dev/null | jq -er '
   [(.resource_changes // [])[] | .change.actions | category] as $actions |
   "### Terraform plan\n\n| Resource action | Count |\n| --- | ---: |\n" +
   (["create", "update", "delete", "replace"] | map(. as $kind | "| " + $kind + " | " + ([$actions[] | select(. == $kind)] | length | tostring) + " |") | join("\n")) +
-  "\n\nReplacement is counted once, separately from create and delete. Addresses, values, outputs, and variables are omitted."
+  "\n\nReplacement is counted once, separately from create and delete. Counts exclude addresses, values, outputs, and variables."
 ' > "$summary" 2>/dev/null; then
-  cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+  if cat "$summary" >> "$GITHUB_STEP_SUMMARY"; then
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'counts-ready=true\n' >> "$GITHUB_OUTPUT"; fi
+  fi
 else
   unavailable 'plan could not be summarized'
 fi
+
+case "${PLAN_SUMMARY_MODE:-counts-only}" in
+  counts-only) ;;
+  human-readable)
+    # Keep the final escaped section below GitHub's 1 MiB per-step limit, even
+    # when every input byte expands to &amp;. A large or failed show is omitted.
+    if terraform show -no-color tfplan.tfplan 2>/dev/null | head -c 180001 > "$summary"; then
+      show_status=0
+    else
+      show_status=1
+    fi
+    size=$(wc -c < "$summary")
+    if (( size > 180000 )); then
+      printf '\nHuman-readable plan omitted: output exceeds 180000 bytes. Counts are shown when available.\n' >> "$GITHUB_STEP_SUMMARY"
+    elif (( show_status != 0 || size == 0 )); then
+      printf '\nHuman-readable plan unavailable. Counts remain available when generated.\n' >> "$GITHUB_STEP_SUMMARY"
+    else
+      if (
+        printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n' || exit 1
+        sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$summary" || exit 1
+        printf '\n</code></pre>\n</details>\n' || exit 1
+      ) >> "$GITHUB_STEP_SUMMARY"; then
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'human-ready=true\n' >> "$GITHUB_OUTPUT"; fi
+      fi
+    fi
+    ;;
+  *)
+    printf '\nUnsupported plan summary mode; only aggregate counts are shown.\n' >> "$GITHUB_STEP_SUMMARY"
+    printf '%s\n' '::warning::Unsupported plan summary mode; only aggregate counts are shown.'
+    ;;
+esac

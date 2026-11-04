@@ -1,0 +1,56 @@
+# Reference only: replace ACTION_COMMIT with a reviewed AardexActions commit SHA.
+name: Persistence Alpha Terraform (reference)
+on:
+  workflow_dispatch:
+    inputs:
+      execution_mode:
+        type: choice
+        required: true
+        default: legacy
+        options: [legacy, reviewed-plan, reviewed-apply]
+      apply:
+        type: boolean
+        required: true
+        default: false
+      plan_id:
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: persistence-alpha-terraform
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    environment: alpha
+    runs-on:
+      group: Aardex
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Load existing deployment identity
+        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0 # v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+          AZ_CRED: op://${{ vars.OP_ADMIN_VAULT_NAME }}/${{ vars.AZ_APPR }}/notes
+      - name: Terraform
+        uses: aardex/AardexActions/terraform-deploy@ACTION_COMMIT
+        with:
+          azure-credentials: ${{ env.AZ_CRED }}
+          azure-subscription: ${{ vars.AZ_SUBSCRIPTION_ID }}
+          github-token: ${{ secrets.TF_MODULES_READ_TOKEN }}
+          directory: ${{ vars.TF_DIR }}
+          tfvars-content: ${{ secrets.TFVARS_CONTENT }}
+          execution-mode: ${{ inputs.execution_mode }}
+          apply: ${{ inputs.apply }}
+          plan-summary-mode: ${{ inputs.execution_mode == 'reviewed-plan' && 'human-readable' || 'counts-only' }}
+          plan-storage: ${{ inputs.execution_mode == 'reviewed-plan' && 'azure-blob' || 'none' }}
+          plan-environment: alpha
+          plan-storage-account: ${{ vars.TF_PLAN_STORAGE_ACCOUNT }}
+          plan-id: ${{ inputs.plan_id }}
