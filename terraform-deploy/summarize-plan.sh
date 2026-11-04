@@ -57,10 +57,9 @@ case "${PLAN_SUMMARY_MODE:-counts-only}" in
       printf '\nHuman-readable plan unavailable. Counts remain available when generated.\n' >> "$GITHUB_STEP_SUMMARY"
     else
       if (
-        set -e
-        printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n'
-        sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$summary"
-        printf '\n</code></pre>\n</details>\n'
+        printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n' || exit 1
+        sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$summary" || exit 1
+        printf '\n</code></pre>\n</details>\n' || exit 1
       ) >> "$GITHUB_STEP_SUMMARY"; then
         if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'human-ready=true\n' >> "$GITHUB_OUTPUT"; fi
       fi
