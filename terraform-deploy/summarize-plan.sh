@@ -25,12 +25,13 @@ if terraform show -json tfplan.tfplan 2>/dev/null | jq -er '
     elif . == ["create"] then "create"
     elif . == ["update"] then "update"
     elif . == ["delete"] then "delete"
+    elif . == ["forget"] then "forget"
     elif . == ["create", "delete"] or . == ["delete", "create"] then "replace"
     else error("unsupported action") end;
   if type != "object" or (.format_version | type != "string") or ((.resource_changes // []) | type != "array") then error("invalid plan") else . end |
   [(.resource_changes // [])[] | .change.actions | category] as $actions |
   "### Terraform plan\n\n| Resource action | Count |\n| --- | ---: |\n" +
-  (["create", "update", "delete", "replace"] | map(. as $kind | "| " + $kind + " | " + ([$actions[] | select(. == $kind)] | length | tostring) + " |") | join("\n")) +
+  (["create", "update", "delete", "replace", "forget"] | map(. as $kind | "| " + $kind + " | " + ([$actions[] | select(. == $kind)] | length | tostring) + " |") | join("\n")) +
   "\n\nReplacement is counted once, separately from create and delete. Counts exclude addresses, values, outputs, and variables."
 ' > "$summary" 2>/dev/null; then
   if cat "$summary" >> "$GITHUB_STEP_SUMMARY"; then
