@@ -75,6 +75,36 @@ esac
         for secret in ['SECRET', 'password', 'customer', 'token', 'module.', 'VARIABLE']:
             self.assertNotIn(secret, summary + result.stdout + result.stderr)
 
+    def test_forget_is_separate_from_delete_and_review_counts_are_ready(self):
+        self.write_plan([['delete']] * 3 + [['forget']] * 4 + [['delete', 'create']])
+        outputs = self.root / 'outputs'
+        result = self.bash('bash "$SUMMARY_SCRIPT"', SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'),
+                           GITHUB_OUTPUT=str(outputs))
+        self.assertEqual(result.returncode, 0)
+        summary = self.summary.read_text()
+        for label, count in [('create', 0), ('update', 0), ('delete', 3), ('replace', 1), ('forget', 4)]:
+            self.assertIn(f'| {label} | {count} |', summary)
+        self.assertEqual(outputs.read_text(), 'counts-ready=true\n')
+        review = self.bash(run_block('Check secure plan review summary'), COUNTS_READY='true',
+                           HUMAN_READY='', SUMMARY_MODE='counts-only')
+        self.assertEqual(review.returncode, 0, review.stderr)
+        self.assertNotIn('SECRET', summary + result.stdout + result.stderr)
+
+    def test_unknown_action_alongside_forget_blocks_review(self):
+        self.write_plan([['forget'], ['unrecognized-SECRET']])
+        outputs = self.root / 'outputs'
+        result = self.bash('bash "$SUMMARY_SCRIPT"', SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'),
+                           GITHUB_OUTPUT=str(outputs))
+        self.assertEqual(result.returncode, 0)
+        self.assertIn('could not be summarized', self.summary.read_text())
+        self.assertNotIn('| forget |', self.summary.read_text())
+        self.assertFalse(outputs.exists())
+        review = self.bash(run_block('Check secure plan review summary'), COUNTS_READY='',
+                           HUMAN_READY='', SUMMARY_MODE='counts-only')
+        self.assertNotEqual(review.returncode, 0)
+        self.assertIn('secure publication stopped', review.stderr)
+        self.assertNotIn('SECRET', self.summary.read_text() + result.stdout + result.stderr)
+
     def test_human_summary_is_opt_in_escaped_and_follows_counts(self):
         self.write_plan([['create']])
         self.human_payload.write_text('public = "visible"\nunmarked = "EXAMPLE-UNMARKED"\nsecret = (sensitive value)\n</code></pre><script>unsafe & markup</script>\n')
@@ -193,7 +223,7 @@ esac
     def test_no_change(self):
         self.write_plan([])
         self.assertEqual(self.summarize().returncode, 0)
-        for label in ('create', 'update', 'delete', 'replace'):
+        for label in ('create', 'update', 'delete', 'replace', 'forget'):
             self.assertIn(f'| {label} | 0 |', self.summary.read_text())
 
     def test_failed_and_missing_plan_do_not_show(self):
