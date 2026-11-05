@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Terraform output is sensitive. Publish only fixed guidance and the process status.
+# Terraform diagnostics may be sensitive; failed pre-apply stages publish a bounded stderr excerpt.
 case "${1:-}" in
   init)
     stage=init; output=init-result.txt
@@ -21,9 +21,18 @@ shift
 umask 077
 # Replace any prior captured output so an existing file cannot retain permissive modes.
 output_ready=false
+diagnostic_file=''
+if [[ "$stage" != apply ]]; then
+  diagnostic_file=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/terraform-diagnostic.XXXXXXXX" 2>/dev/null) || diagnostic_file=''
+fi
+trap '[[ -z "$diagnostic_file" ]] || rm -f -- "$diagnostic_file"' EXIT
 if rm -f -- "$output" 2>/dev/null; then
   output_ready=true
-  if "$@" > "$output" 2>&1; then
+  if [[ -n "$diagnostic_file" ]]; then
+    if "$@" > "$output" 2> "$diagnostic_file"; then status=0; else status=$?; fi
+    # Keep both streams on the runner; this must not change Terraform's status.
+    cat "$diagnostic_file" >> "$output" 2>/dev/null || :
+  elif "$@" > "$output" 2>&1; then
     status=0
   else
     status=$?
@@ -44,5 +53,8 @@ printf '::error::Terraform %s failed (exit status %d). %s See terraform-deploy R
 # A summary write failure must not replace the original Terraform exit status.
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
   { printf '### Terraform %s failed\n\nExit status %d. %s See terraform-deploy README: Failure diagnostics.\n' "$stage" "$status" "$advice" >> "$GITHUB_STEP_SUMMARY"; } 2>/dev/null || :
+  if [[ "$output_ready" == true && -n "$diagnostic_file" && -s "$diagnostic_file" ]]; then
+    python3 "$(dirname "${BASH_SOURCE[0]}")/summarize-failure.py" "$diagnostic_file" 2>/dev/null || :
+  fi
 fi
 exit "$status"

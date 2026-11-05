@@ -47,7 +47,9 @@ Blob storage is opt-in. It requires the independently provisioned private storag
 
 ### Failure diagnostics
 
-A failed init, validate, plan or apply produces a GitHub error annotation and job-summary entry containing only the fixed stage, numeric process exit status and fixed stage-specific next steps. The original exit status is preserved; the status alone does not establish the cause. No raw Terraform diagnostic is published. A failure preparing the local output file can also produce this stage report without starting Terraform. Failures in earlier setup or a terminated runner may prevent the report.
+A failed init, validate, plan or apply produces a GitHub error annotation and job-summary entry with the stage, numeric exit status and stage-specific next steps. On failure, init, validate and plan also automatically publish a collapsible excerpt of Terraform's standard error in the job summary, limited to the last 32000 bytes and HTML-escaped. Standard output is not included in this excerpt. No input is required. The original exit status is preserved, including when summary generation fails. Empty or unavailable stderr, a failure preparing the capture, earlier setup failure or runner termination can leave no excerpt. This also applies to init in the saved-plan apply action. Apply diagnostics retain the separate behavior described above.
+
+**Failure diagnostics can expose secrets and other sensitive data** to anyone who can view the workflow run. Terraform errors and provider messages can include values that Terraform does not identify as sensitive; truncation, HTML escaping and GitHub secret masking do not guarantee redaction. Treat the job summary as sensitive and review its access and retention. No full captured output, binary plan or JSON plan is uploaded as an artifact by this action. Temporary stderr is removed on normal exit; abrupt runner termination can leave local files on persistent runners.
 
 An authorized operator can use the run link, selected revision, timestamp, environment, failing stage and exit status to investigate using the consumer's restricted telemetry and access procedures:
 

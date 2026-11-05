@@ -40,7 +40,7 @@ class PlanTests(unittest.TestCase):
 printf '%s\\n' "$*" >> "$CALLS"
 case "$1" in
   init|validate) echo "$1-SECRET"; printf '%s\n' '::error::STDERR-SECRET' 'https://secret.example/token' >&2; exit "${STAGE_EXIT:-0}" ;;
-  plan) echo 'PLAN-SECRET'; if [[ ${PLAN_FAIL:-0} == 1 ]]; then exit 7; fi; touch tfplan.tfplan ;;
+  plan) echo 'PLAN-SECRET'; if [[ ${PLAN_FAIL:-0} == 1 ]]; then printf '%s\n' 'plan diagnostic <failure> & details' >&2; exit 7; fi; touch tfplan.tfplan ;;
   show) if [[ $2 == -json ]]; then cat "$PAYLOAD"; exit "${SHOW_EXIT:-0}"; else cat "$HUMAN_PAYLOAD"; echo 'SHOW-SECRET' >&2; exit "${HUMAN_SHOW_EXIT:-0}"; fi ;;
   apply) echo 'APPLY-SECRET'; exit "${APPLY_EXIT:-0}" ;;
 esac
@@ -215,7 +215,7 @@ esac
             self.assertIn('could not be summarized', self.summary.read_text())
             self.assertNotIn('SECRET', self.summary.read_text() + result.stdout + result.stderr)
 
-    def test_failures_expose_only_fixed_stage_and_numeric_status(self):
+    def test_failure_diagnostics_expose_stderr_only_in_summary(self):
         cases = [
             ('Terraform Init', 'init', {'STAGE_EXIT': '13'}, 13),
             ('Terraform Validate', 'validate', {'STAGE_EXIT': '13'}, 13),
@@ -231,11 +231,40 @@ esac
                 self.assertIn(f'Terraform {stage} failed', summary)
                 self.assertIn(f'exit status {status}', summary.lower())
                 self.assertIn(f'Terraform {stage} failed', result.stdout + result.stderr)
-                self.assertNotIn('SECRET', summary + result.stdout + result.stderr)
-                self.assertNotIn('secret.example', summary + result.stdout + result.stderr)
+                self.assertNotIn('SECRET', result.stdout + result.stderr)
+                self.assertNotIn('secret.example', result.stdout + result.stderr)
                 if stage == 'apply':
                     self.assertIn('partial', summary.lower())
                     self.assertIn('retry', summary.lower())
+                    self.assertNotIn('SECRET', summary)
+                    self.assertNotIn('<details>', summary)
+                else:
+                    self.assertIn('<details>', summary)
+                    self.assertIn('</details>', summary)
+                    if stage == 'plan':
+                        self.assertIn('plan diagnostic &lt;failure&gt; &amp; details', summary)
+                        self.assertNotIn('PLAN-SECRET', summary)
+                    else:
+                        self.assertIn('STDERR-SECRET', summary)
+                        self.assertNotIn(f'{stage}-SECRET', summary)
+
+    def test_failure_diagnostic_is_bounded_and_escaped(self):
+        fake = self.root / 'bin/terraform'
+        fake.write_text("#!/usr/bin/env python3\nimport sys\nsys.stderr.write('old-marker' + '&' * 40000 + '</code><script>')\nsys.exit(23)\n")
+        result = self.bash(run_block('Terraform Plan'))
+        self.assertEqual(result.returncode, 23)
+        summary = self.summary.read_text()
+        self.assertIn('truncated', summary.lower())
+        self.assertNotIn('old-marker', summary)
+        self.assertIn('&lt;/code&gt;&lt;script&gt;', summary)
+        self.assertLess(len(summary.encode()), 200000)
+        self.assertNotIn('old-marker', result.stdout + result.stderr)
+
+    def test_stderr_unavailable_does_not_prevent_failure(self):
+        result = self.bash(run_block('Terraform Plan'), PLAN_FAIL='1', RUNNER_TEMP=str(self.root / 'missing'))
+        self.assertEqual(result.returncode, 7)
+        self.assertIn('Terraform plan failed', self.summary.read_text())
+        self.assertNotIn('<details>', self.summary.read_text())
 
     def test_success_has_no_failure_report_and_failed_summary_keeps_exit_code(self):
         result = self.bash(run_block('Terraform Init'))
@@ -333,6 +362,29 @@ esac
 
 
 class LocalTerraformTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('terraform'), 'Terraform is not installed')
+    def test_real_failed_plan_reports_diagnostic(self):
+        # Invalid local configuration; no providers, backend, credentials or apply.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'main.tf').write_text('this is invalid terraform\n')
+            (root / 'terraform.rc').write_text('disable_checkpoint = true\n')
+            env = {key: value for key, value in os.environ.items()
+                   if not key.startswith(('TF_', 'ARM_', 'AWS_', 'GOOGLE_'))}
+            env.update(HOME=temp, TF_CLI_CONFIG_FILE=str(root / 'terraform.rc'),
+                       TF_IN_AUTOMATION='1', PLAN_ARGS='', ACTION_PATH=str(ACTION),
+                       GITHUB_STEP_SUMMARY=str(root / 'summary'), RUNNER_TEMP=temp)
+            result = subprocess.run(['bash', '-e', '-o', 'pipefail', '-c', run_block('Terraform Plan')],
+                                    cwd=root, env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            summary = (root / 'summary').read_text()
+            self.assertIn('<details>', summary)
+            self.assertIn('Error:', summary)
+            self.assertIn('main.tf', summary)
+            self.assertNotIn('Error:', result.stdout + result.stderr)
+            self.assertFalse((root / 'tfplan.tfplan').exists())
+            self.assertFalse((root / 'terraform.tfstate').exists())
+
     @unittest.skipUnless(shutil.which('terraform'), 'Terraform is not installed')
     def test_real_human_plan_sensitive_and_nonsensitive(self):
         # Disposable local plan with only Terraform's built-in provider, no cloud access.
