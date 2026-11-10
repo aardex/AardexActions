@@ -17,7 +17,7 @@ fi
 
 umask 077
 summary=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/terraform-summary.XXXXXXXX") || exit 1
-trap 'rm -f "$summary"' EXIT
+trap 'rm -f "$summary" "$summary.excerpt"' EXIT
 # Terraform JSON and diagnostics stay in the pipe; neither is written to the log or disk.
 if terraform show -json tfplan.tfplan 2>/dev/null | jq -er '
   def category:
@@ -44,8 +44,12 @@ fi
 case "${PLAN_SUMMARY_MODE:-counts-only}" in
   counts-only) ;;
   human-readable)
-    # Keep the final escaped section below GitHub's 1 MiB per-step limit, even
-    # when every input byte expands to &amp;. A large or failed show is omitted.
+    # Publish at most 180000 raw bytes. HTML escaping can expand one byte to five
+    # characters; this keeps the final step summary below GitHub's 1 MiB limit.
+    # Oversized plans are truncated, not omitted, so the reviewed-plan handoff
+    # still has a human excerpt; the saved tfplan remains complete in Blob.
+    excerpt="$summary"
+    truncated=false
     if terraform show -no-color tfplan.tfplan 2>/dev/null | head -c 180001 > "$summary"; then
       show_status=0
     else
@@ -53,15 +57,31 @@ case "${PLAN_SUMMARY_MODE:-counts-only}" in
     fi
     size=$(wc -c < "$summary")
     if (( size > 180000 )); then
-      printf '\nHuman-readable plan omitted: output exceeds 180000 bytes. Counts are shown when available.\n' >> "$GITHUB_STEP_SUMMARY"
-    elif (( show_status != 0 || size == 0 )); then
+      excerpt="${summary}.excerpt"
+      if head -c 180000 "$summary" > "$excerpt"; then
+        truncated=true
+      else
+        show_status=1
+      fi
+    fi
+    if (( show_status != 0 || size == 0 )); then
       printf '\nHuman-readable plan unavailable. Counts remain available when generated.\n' >> "$GITHUB_STEP_SUMMARY"
     else
       if (
-        printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n' || exit 1
-        sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$summary" || exit 1
+        if [[ "$truncated" == true ]]; then
+          printf '\n<details>\n<summary>Human-readable Terraform plan (truncated; may contain sensitive data)</summary>\n\n<pre><code>\n' || exit 1
+        else
+          printf '\n<details>\n<summary>Human-readable Terraform plan (may contain sensitive data)</summary>\n\n<pre><code>\n' || exit 1
+        fi
+        sed -e 's/\&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$excerpt" || exit 1
+        if [[ "$truncated" == true ]]; then
+          printf '\n[... excerpt truncated at 180000 bytes; the saved plan is complete ...]\n' || exit 1
+        fi
         printf '\n</code></pre>\n</details>\n' || exit 1
       ) >> "$GITHUB_STEP_SUMMARY"; then
+        if [[ "$truncated" == true ]]; then
+          printf '\nHuman-readable plan excerpt truncated at 180000 bytes; counts and the saved plan remain complete.\n' >> "$GITHUB_STEP_SUMMARY"
+        fi
         if [[ -n "${GITHUB_OUTPUT:-}" ]]; then printf 'human-ready=true\n' >> "$GITHUB_OUTPUT"; fi
       fi
     fi

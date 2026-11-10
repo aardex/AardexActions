@@ -147,8 +147,9 @@ esac
                            SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'))
         self.assertEqual(result.returncode, 0)
         self.assertIn('| update | 1 |', self.summary.read_text())
-        self.assertIn('exceeds', self.summary.read_text())
-        self.assertNotIn('<details>', self.summary.read_text())
+        self.assertIn('truncated', self.summary.read_text())
+        self.assertIn('<details>', self.summary.read_text())
+        self.assertIn('excerpt truncated at 180000 bytes', self.summary.read_text())
         self.assertLess(self.summary.stat().st_size, 1048576)
         self.summary.unlink()
         self.human_payload.write_text('confidential but incomplete')
@@ -185,7 +186,7 @@ esac
                            SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'), GITHUB_OUTPUT=str(outputs))
         self.assertEqual(result.returncode, 0)
         self.assertIn('counts-ready=true', outputs.read_text())
-        self.assertNotIn('human-ready=true', outputs.read_text())
+        self.assertIn('human-ready=true', outputs.read_text())
 
     def test_failed_human_renderer_does_not_set_ready_flag(self):
         self.write_plan([])
