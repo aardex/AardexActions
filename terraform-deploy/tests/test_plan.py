@@ -162,6 +162,18 @@ esac
         self.assertNotIn('SHOW-SECRET', result.stdout + result.stderr + self.summary.read_text())
         self.assertEqual(list(self.root.glob('terraform-summary.*')), [])
 
+    def test_human_mode_truncation_tolerates_terraform_sigpipe(self):
+        self.write_plan([])
+        self.human_payload.write_text('x' * 180001)
+        result = self.bash('bash "$SUMMARY_SCRIPT"', PLAN_SUMMARY_MODE='human-readable',
+                           HUMAN_SHOW_EXIT='141',
+                           SUMMARY_SCRIPT=str(ACTION / 'summarize-plan.sh'))
+        self.assertEqual(result.returncode, 0)
+        summary = self.summary.read_text()
+        self.assertIn('<details>', summary)
+        self.assertIn('truncated at 180000 bytes', summary)
+        self.assertLess(self.summary.stat().st_size, 1048576)
+
     def test_largest_allowed_escaped_output_fits_summary(self):
         self.write_plan([])
         self.human_payload.write_text('&' * 180000)

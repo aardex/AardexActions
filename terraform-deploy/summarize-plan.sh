@@ -50,21 +50,34 @@ case "${PLAN_SUMMARY_MODE:-counts-only}" in
     # still has a human excerpt; the saved tfplan remains complete in Blob.
     excerpt="$summary"
     truncated=false
-    if terraform show -no-color tfplan.tfplan 2>/dev/null | head -c 180001 > "$summary"; then
-      show_status=0
-    else
-      show_status=1
-    fi
+    # head closes the pipe after the bounded read; with pipefail, Terraform may
+    # exit 141 (SIGPIPE) even though the saved plan is valid. Capture both
+    # statuses and treat SIGPIPE as success only when the output was truncated.
+    set +o pipefail
+    terraform show -no-color tfplan.tfplan 2>/dev/null | head -c 180001 > "$summary"
+    show_pipe_status=("${PIPESTATUS[@]}")
+    set -o pipefail
+    terraform_status=${show_pipe_status[0]:-1}
+    head_status=${show_pipe_status[1]:-1}
     size=$(wc -c < "$summary")
     if (( size > 180000 )); then
-      excerpt="${summary}.excerpt"
-      if head -c 180000 "$summary" > "$excerpt"; then
-        truncated=true
-      else
+      if (( head_status != 0 || (terraform_status != 0 && terraform_status != 141) )); then
         show_status=1
+      else
+        show_status=0
+        excerpt="${summary}.excerpt"
+        if head -c 180000 "$summary" > "$excerpt"; then
+          truncated=true
+        else
+          show_status=1
+        fi
       fi
+    elif (( terraform_status != 0 || head_status != 0 || size == 0 )); then
+      show_status=1
+    else
+      show_status=0
     fi
-    if (( show_status != 0 || size == 0 )); then
+    if (( show_status != 0 )); then
       printf '\nHuman-readable plan unavailable. Counts remain available when generated.\n' >> "$GITHUB_STEP_SUMMARY"
     else
       if (
