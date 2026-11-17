@@ -70,20 +70,18 @@ class Collector:
         self.api, self.repo = api, repo
         self.errors, self.missing = [], []
 
-    def _try(self, what, fn, default=None, missing=True):
+    def _try(self, what, fn, default=None):
         try:
             return fn()
         except NotFound:
-            if missing:
-                self.missing.append(what)
+            self.missing.append(what)
             return default
         except RuntimeError as exc:  # never silently treat an API failure as absence
             self.errors.append({'what': what, 'error': str(exc)})
             return default
 
-    def file_at(self, path, ref, record_missing=True):
-        data = self._try(f'{path}@{ref[:12]}', lambda: self.api.get(f'repos/{self.repo}/contents/{path}?ref={ref}'),
-                         missing=record_missing)
+    def file_at(self, path, ref):
+        data = self._try(f'{path}@{ref[:12]}', lambda: self.api.get(f'repos/{self.repo}/contents/{path}?ref={ref}'))
         if not data or 'content' not in data:
             return None
         return base64.b64decode(data['content']).decode('utf-8', errors='replace')
