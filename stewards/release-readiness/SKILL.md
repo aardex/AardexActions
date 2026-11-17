@@ -35,7 +35,7 @@ error is *unknown*, never *absent* and never *passed*.
 
 Read the consumer's release documentation (e.g. `documentation/release.md`,
 `docs/release.md`) and, for semantics, the engine contract at the pinned revision
-(`workflow_pins` in the facts): `release-management/README.md` and
+(`workflow_pins` in the facts): `release-management/README.md` and, when it exists at that revision,
 `release-management/deterministic-gates.md`. Key meanings to respect:
 - `release-inputs` / `release-tests` are release *mechanics*, never product tests.
 - A manifest section with `state: missing` means not collected; `available` means
