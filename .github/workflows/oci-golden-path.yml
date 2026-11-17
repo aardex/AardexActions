@@ -1,0 +1,30 @@
+name: OCI golden path CI
+on:
+  pull_request:
+    paths: [.github/workflows/oci-*.yml, oci-golden-path/**]
+  push:
+    branches: [main]
+    paths: [.github/workflows/oci-*.yml, oci-golden-path/**]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Validate reusable workflows and example with pinned actionlint
+        env:
+          ACTIONLINT_TEMP: ${{ runner.temp }}/oci-actionlint
+        run: |
+          mkdir -p "$ACTIONLINT_TEMP"
+          curl --fail --silent --show-error --location \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$ACTIONLINT_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' \
+            "$ACTIONLINT_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$ACTIONLINT_TEMP/actionlint.tar.gz" -C "$ACTIONLINT_TEMP" actionlint
+          "$ACTIONLINT_TEMP/actionlint" .github/workflows/oci-*.yml oci-golden-path/examples/*.yml

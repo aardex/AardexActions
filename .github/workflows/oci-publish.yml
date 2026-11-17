@@ -1,0 +1,286 @@
+name: OCI publish once
+
+# Reusable workflow (EN-45 / INFRA-396). Builds one exact source SHA once, pushes it to the shared private registry
+# under a unique, never-reused tag and returns the content-addressed reference that every environment deploys.
+# Re-running for the same SHA reuses the existing image instead of rebuilding, so a digest is never replaced.
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: Registry repository name, for example mma-backend-api
+        required: true
+        type: string
+      dockerfile:
+        description: Repository-relative Dockerfile path
+        required: false
+        type: string
+        default: Dockerfile
+      context:
+        description: Repository-relative Docker build context
+        required: false
+        type: string
+        default: .
+      source-ref:
+        description: Exact 40-character commit SHA to build; empty builds the caller's github.sha
+        required: false
+        type: string
+        default: ''
+      version:
+        description: Optional human-readable version prefix for the unique tag (<version>-<sha12>)
+        required: false
+        type: string
+        default: ''
+      registry:
+        description: Shared registry login server
+        required: false
+        type: string
+        default: acradxinframgmeun.azurecr.io
+      build-args:
+        description: Non-secret build arguments (multi-line KEY=VALUE). NUGET_PAT is rejected.
+        required: false
+        type: string
+        default: ''
+      nuget-secret:
+        description: Mount secrets.NUGET_PAT as the BuildKit secret id nuget_pat
+        required: false
+        type: boolean
+        default: false
+      platforms:
+        description: Target platform(s)
+        required: false
+        type: string
+        default: linux/amd64
+      vulnerability-gate:
+        description: "report: scan and summarize; block: fail on unfixed CRITICAL/HIGH; off: no scan"
+        required: false
+        type: string
+        default: report
+      runs-on:
+        description: JSON runs-on value. The default private runner group reaches the registry over Private Link.
+        required: false
+        type: string
+        default: '{"group":"aardex"}'
+      credential-environment:
+        description: Optional GitHub Environment whose variables hold OP_ADMIN_VAULT_NAME/AZ_APPR (no deployment)
+        required: false
+        type: string
+        default: ''
+    secrets:
+      OP_CONNECT_TOKEN:
+        description: 1Password service account token resolving the existing Azure automation credential
+        required: true
+      NUGET_PAT:
+        description: Read-only package token, only when nuget-secret is true
+        required: false
+    outputs:
+      image-ref:
+        description: Content-addressed reference <registry>/<image-name>@sha256:<digest>
+        value: ${{ jobs.publish.outputs.image-ref }}
+      digest:
+        description: sha256 manifest digest
+        value: ${{ jobs.publish.outputs.digest }}
+      tag:
+        description: Unique informational tag
+        value: ${{ jobs.publish.outputs.tag }}
+      source-sha:
+        description: Exact source commit that was built
+        value: ${{ jobs.publish.outputs.source-sha }}
+      manifest-data:
+        description: EN-44 release-management manifest-data JSON declaring this image for source-sha
+        value: ${{ jobs.publish.outputs.manifest-data }}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    environment: ${{ inputs.credential-environment }}
+    timeout-minutes: 60
+    outputs:
+      image-ref: ${{ steps.result.outputs.image-ref }}
+      digest: ${{ steps.result.outputs.digest }}
+      tag: ${{ steps.plan.outputs.tag }}
+      source-sha: ${{ steps.plan.outputs.sha }}
+      manifest-data: ${{ steps.result.outputs.manifest-data }}
+    steps:
+      - name: Validate inputs
+        env:
+          IMAGE: ${{ inputs.image-name }}
+          SOURCE_REF: ${{ inputs.source-ref }}
+          VERSION: ${{ inputs.version }}
+          REGISTRY: ${{ inputs.registry }}
+          GATE: ${{ inputs.vulnerability-gate }}
+          BUILD_ARGS: ${{ inputs.build-args }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE" =~ ^[a-z0-9]+([._-][a-z0-9]+)*(/[a-z0-9]+([._-][a-z0-9]+)*)*$ ]] || { echo 'Invalid image-name.' >&2; exit 1; }
+          [[ -z "$SOURCE_REF" || "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]] || { echo 'source-ref must be a full commit SHA.' >&2; exit 1; }
+          [[ -z "$VERSION" || "$VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$ ]] || { echo 'Invalid version.' >&2; exit 1; }
+          [[ "$REGISTRY" =~ ^[a-z0-9]+\.azurecr\.io$ ]] || { echo 'registry must be an Azure Container Registry login server.' >&2; exit 1; }
+          [[ "$GATE" =~ ^(report|block|off)$ ]] || { echo 'vulnerability-gate must be report, block or off.' >&2; exit 1; }
+          if printf '%s\n' "$BUILD_ARGS" | grep -qiE '^[[:space:]]*"?NUGET_PAT[[:space:]]*='; then
+            echo 'NUGET_PAT must not be a build argument; use nuget-secret.' >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Resolve exact source and unique tag
+        id: plan
+        env:
+          VERSION: ${{ inputs.version }}
+          EXPECTED: ${{ inputs.source-ref || github.sha }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" == "$EXPECTED" ]] || { echo "Checked out $sha, expected $EXPECTED." >&2; exit 1; }
+          short="${sha:0:12}"
+          tag="${VERSION:+$VERSION-}$short"
+          [[ -n "$VERSION" ]] || tag="sha-$short"
+          {
+            echo "sha=$sha"
+            echo "tag=$tag"
+            echo "created=$(git show -s --format=%cI HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Load Azure automation credential
+        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0 # v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+          AZ_CRED: op://${{ vars.OP_ADMIN_VAULT_NAME }}/${{ vars.AZ_APPR }}/notes
+
+      - name: Sign in to Azure and the registry
+        env:
+          REGISTRY: ${{ inputs.registry }}
+        run: |
+          set -euo pipefail
+          client_id="$(jq -r .clientId <<<"$AZ_CRED")"
+          tenant_id="$(jq -r .tenantId <<<"$AZ_CRED")"
+          client_secret="$(jq -r .clientSecret <<<"$AZ_CRED")"
+          echo "::add-mask::$client_secret"
+          az login --service-principal --username "$client_id" --password "$client_secret" --tenant "$tenant_id" --allow-no-subscriptions --output none --only-show-errors
+          az acr login --name "${REGISTRY%%.*}" --only-show-errors
+
+      - name: Reuse an image already published for this source
+        id: existing
+        env:
+          REF: ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.plan.outputs.tag }}
+          SHA: ${{ steps.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if ! docker buildx imagetools inspect "$REF" > /dev/null 2>&1; then
+            echo 'found=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          digest="$(docker buildx imagetools inspect "$REF" --format '{{json .Manifest}}' | jq -r .digest)"
+          revision="$(docker buildx imagetools inspect "$REF" --format '{{json .Image}}' | jq -r '.config.Labels["org.opencontainers.image.revision"] // empty')"
+          [[ "$revision" == "$SHA" ]] || {
+            echo "$REF exists but was not built from $SHA (revision label: ${revision:-none}). Refusing to overwrite." >&2
+            exit 1
+          }
+          echo 'found=true' >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push once
+        id: build
+        if: steps.existing.outputs.found != 'true'
+        uses: docker/build-push-action@v6
+        env:
+          NUGET_PAT_SECRET: ${{ secrets.NUGET_PAT }}
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          push: true
+          provenance: false
+          tags: ${{ inputs.registry }}/${{ inputs.image-name }}:${{ steps.plan.outputs.tag }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.plan.outputs.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ inputs.version || steps.plan.outputs.tag }}
+            org.opencontainers.image.created=${{ steps.plan.outputs.created }}
+          build-args: ${{ inputs.build-args }}
+          secret-envs: ${{ inputs.nuget-secret && 'nuget_pat=NUGET_PAT_SECRET' || '' }}
+
+      - name: Resolve content-addressed reference
+        id: result
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          IMAGE: ${{ inputs.image-name }}
+          DIGEST: ${{ steps.existing.outputs.digest || steps.build.outputs.digest }}
+          SHA: ${{ steps.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'No valid image digest was produced.' >&2; exit 1; }
+          ref="$REGISTRY/$IMAGE@$DIGEST"
+          revision="$(docker buildx imagetools inspect "$ref" --format '{{json .Image}}' | jq -r '.config.Labels["org.opencontainers.image.revision"] // empty')"
+          [[ "$revision" == "$SHA" ]] || { echo "Published $ref does not carry revision $SHA." >&2; exit 1; }
+          manifest_data="$(jq -cn --arg ref "$ref" --arg digest "$DIGEST" --arg sha "$SHA" \
+            '{artifacts:{state:"available",items:[{type:"container",reference:$ref,digest:$digest,release_sha:$sha,verification:"declared"}]}}')"
+          {
+            echo "image-ref=$ref"
+            echo "digest=$DIGEST"
+            echo "manifest-data=$manifest_data"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Protect the published digest from deletion and overwrite
+        id: lock
+        continue-on-error: true
+        env:
+          REGISTRY: ${{ inputs.registry }}
+          IMAGE: ${{ inputs.image-name }}
+          DIGEST: ${{ steps.result.outputs.digest }}
+        run: |
+          set -euo pipefail
+          az acr repository update --name "${REGISTRY%%.*}" --image "$IMAGE@$DIGEST" \
+            --delete-enabled false --write-enabled false --only-show-errors --output none
+
+      - name: Scan the published digest
+        if: inputs.vulnerability-gate != 'off'
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ steps.result.outputs.image-ref }}
+          format: table
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          exit-code: ${{ inputs.vulnerability-gate == 'block' && '1' || '0' }}
+
+      - name: Summarize
+        if: always() && steps.result.outputs.image-ref != ''
+        env:
+          REF: ${{ steps.result.outputs.image-ref }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          SHA: ${{ steps.plan.outputs.sha }}
+          REUSED: ${{ steps.existing.outputs.found }}
+          LOCKED: ${{ steps.lock.outcome }}
+          GATE: ${{ inputs.vulnerability-gate }}
+        run: |
+          {
+            echo '## OCI publish once'
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Source SHA | \`$SHA\` |"
+            echo "| Image | \`$REF\` |"
+            echo "| Unique tag | \`$TAG\` |"
+            echo "| Reused existing image | \`${REUSED:-false}\` |"
+            echo "| Delete/overwrite lock | \`$LOCKED\` |"
+            echo "| Vulnerability gate | \`$GATE\` |"
+            echo
+            echo 'Promote this exact reference; do not rebuild per environment.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sign out
+        if: always()
+        run: az logout || true
