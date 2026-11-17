@@ -1,0 +1,23 @@
+name: Stewards CI
+on:
+  pull_request:
+    paths: [stewards/**, release-management/manifest.py, .github/workflows/stewards.yml]
+  push:
+    branches: [main]
+    paths: [stewards/**, release-management/manifest.py, .github/workflows/stewards.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  collector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - run: python3 -m unittest discover -s stewards/tests -v
+      - run: python3 -m compileall -q stewards
