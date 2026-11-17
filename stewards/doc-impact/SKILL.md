@@ -45,8 +45,10 @@ When a rule there conflicts with this file, the governance document wins.
    version-specific → component ADR → cross-project normative → human narrative →
    unresolved). Record the domain id and its maintenance mode.
 4. **Classify confidence.**
-   - *Confirmed*: you can point to a file and line that the diff makes wrong or
-     incomplete, or a documented obligation (generated reference, link check) that fails.
+   - *Confirmed*: you can point to a file and line that the diff makes wrong, an
+     enumeration (list, table, inventory) that now omits what the diff adds, or a documented
+     obligation (generated reference, link check) that fails. Text that never covered the
+     changed detail is not made incomplete by the change; at most it is *uncertain*.
    - *Uncertain*: plausible impact that needs a human to confirm (intent, audience,
      ownership, controlled scope). Say what would confirm or dismiss it.
    Do not inflate: "no meaningful documentation impact" is a valid, common result.
