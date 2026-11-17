@@ -1,10 +1,10 @@
 name: OCI golden path CI
 on:
   pull_request:
-    paths: [.github/workflows/oci-*.yml, oci-golden-path/**]
+    paths: [.github/workflows/oci-*.yml, oci-golden-path/**, release-management/manifest.py, release-management/release-manifest.schema.json]
   push:
     branches: [main]
-    paths: [.github/workflows/oci-*.yml, oci-golden-path/**]
+    paths: [.github/workflows/oci-*.yml, oci-golden-path/**, release-management/manifest.py, release-management/release-manifest.schema.json]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,6 +16,13 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Run workflow step and manifest compatibility tests
+        run: |
+          python3 -m pip install -r release-management/requirements-ci.txt
+          python3 -m unittest discover -s oci-golden-path/tests -v
       - name: Validate reusable workflows and example with pinned actionlint
         env:
           ACTIONLINT_TEMP: ${{ runner.temp }}/oci-actionlint

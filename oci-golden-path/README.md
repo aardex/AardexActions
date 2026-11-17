@@ -7,7 +7,7 @@ same digest through Alpha, Beta and Prod → roll back to a retained digest**. T
 | Workflow | Does | Never does |
 | --- | --- | --- |
 | [`oci-publish.yml`](../.github/workflows/oci-publish.yml) | Builds one exact SHA, pushes `<registry>/<image>:<version>-<sha12>` to the shared registry, labels it with `org.opencontainers.image.revision/source`, locks the digest against delete/overwrite, optionally scans it, returns `image-ref` and EN-44 `manifest-data`. A rerun for the same SHA reuses the existing digest. | Deploy, push `latest`, inject environment configuration, rebuild an existing source |
-| [`oci-promote-containerapp.yml`](../.github/workflows/oci-promote-containerapp.yml) | In one GitHub Environment: checks the reference is `shared-registry/repo@sha256:…`, the digest exists and carries a source revision (optionally an expected SHA), optionally proves the run was approved for that environment, updates each Container App, waits for a healthy revision, writes a promotion record (approvers, previous and new revision/image). | Build, accept tags, change registry/identity configuration, skip the environment's protection rules |
+| [`oci-promote-containerapp.yml`](../.github/workflows/oci-promote-containerapp.yml) | In one GitHub Environment: checks the reference is `shared-registry/repo@sha256:…`, the digest exists, was built from **the calling repository** (`org.opencontainers.image.source`) and carries a source revision (optionally an expected SHA), optionally proves the run was approved for that environment, updates each Container App, waits for a healthy revision, writes a promotion record (approvers, previous and new revision/image). | Build, accept tags, change registry/identity configuration, skip the environment's protection rules |
 
 ## Contracts
 
@@ -20,9 +20,13 @@ same digest through Alpha, Beta and Prod → roll back to a retained digest**. T
 - **Traceability**: source SHA (image label) → digest → environment → approvers → run URL → previous/new revision
   in the job summary and the `oci-promotion-<env>-<attempt>` artifact (90 days). GitHub also records each
   environment deployment.
-- **Rollback**: rerun promote for the environment with `image-ref` set to the previous image from the promotion
-  record. Published digests are locked and the shared registry has no untagged-manifest retention, so they stay
-  available.
+- **Rollback**: rerun promote with `image-ref` set to the previous shared-registry digest from the promotion record.
+  Published digests are locked and the shared registry has no untagged-manifest retention, so they stay available.
+  A caller that chains Alpha → Beta → Prod also re-promotes the lower environments when rolling Prod back; that is
+  intended (Prod never runs a digest the lower environments do not). **First cutover only:** the previous image is
+  an environment-registry tag without OCI labels, which promote rejects. Break-glass rollback is
+  `az containerapp update -n <app> -g <rg> --image <previous_image from the record>`; it works because workload
+  Terraform keeps the environment registry configured next to the shared one until phase 2.
 - **Registry access is Terraform-owned**: each Container App must already list the shared registry with a pull
   identity that has `AcrPull` (`context_environment.shared_container_registry`). Promote checks this for every app
   before changing any of them.
@@ -62,8 +66,17 @@ automation principal (`AZ_APPR`) is the only identity with `AcrPush`; runtime id
 
 ## Limits
 
-- Single-platform images (default `linux/amd64`); provenance attestations and SBOM generation are not produced by
-  this workflow (manifest `sbom`/`provenance` stay `missing` unless a consumer declares them).
+- Single-platform images (default `linux/amd64`): the source checks read the single image config.
+- **Accepted limitation — SBOM and provenance.** The release standard lists SBOM and artifact provenance as
+  "where applicable", progressively added to the Release Manifest; EN-44 records them explicitly as `missing`
+  by default. This workflow produces neither: BuildKit provenance/SBOM attestations would turn the digest into an
+  image index and break the single-config source check, and nothing consumes them yet. Provenance today is the
+  OCI `revision`/`source` labels checked at promotion plus the immutable digest in the manifest `artifacts`
+  section. Adding attestations is a separate, reviewed change when a consumer (e.g. signature/attestation
+  verification at deploy) exists.
+- `credential-environment`: `AZ_APPR` is environment-scoped in current consumers, so callers pass an environment
+  (e.g. `alpha`); the publish job then appears as an `alpha` deployment. An empty value (no environment) has not
+  been exercised yet.
 - The delete/overwrite lock is best effort; the summary shows whether it applied.
 - `vulnerability-gate` defaults to `report` to keep current consumer behaviour; set `block` to enforce.
 - Container Apps only. Terraform-owned images (images set by `acr_docker_image` in workload Terraform) must first

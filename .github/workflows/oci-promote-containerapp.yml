@@ -105,7 +105,8 @@ jobs:
           RUN_URL: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/approvals
         run: |
           set -euo pipefail
-          approvals="$(gh api "$RUN_URL" --jq "[.[] | select(.state == \"approved\") | select(any(.environments[]; .name == \"$ENVIRONMENT\")) | {user: .user.login, comment: .comment}]")"
+          approvals="$(gh api "$RUN_URL" | jq -c --arg env "$ENVIRONMENT" \
+            '[.[] | select(.state == "approved") | select(any(.environments[]; (.name | ascii_downcase) == ($env | ascii_downcase))) | {user: .user.login, comment: .comment}]')"
           echo "approvals=$approvals" >> "$GITHUB_OUTPUT"
           if [[ "$REQUIRED" == 'true' && "$(jq length <<<"$approvals")" -lt 1 ]]; then
             echo "No recorded human approval for environment '$ENVIRONMENT' in this run." >&2
@@ -141,6 +142,7 @@ jobs:
         env:
           IMAGE_REF: ${{ inputs.image-ref }}
           EXPECTED_SHA: ${{ inputs.expected-source-sha }}
+          EXPECTED_SOURCE: ${{ github.server_url }}/${{ github.repository }}
         run: |
           set -euo pipefail
           config="$(docker buildx imagetools inspect "$IMAGE_REF" --format '{{json .Image}}')" || {
@@ -150,6 +152,10 @@ jobs:
           revision="$(jq -r '.config.Labels["org.opencontainers.image.revision"] // empty' <<<"$config")"
           source="$(jq -r '.config.Labels["org.opencontainers.image.source"] // empty' <<<"$config")"
           [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Image has no source revision label; publish it with oci-publish.' >&2; exit 1; }
+          [[ "$source" == "$EXPECTED_SOURCE" ]] || {
+            echo "Image was built from '${source:-unknown}', not $EXPECTED_SOURCE; refusing to promote another repository's image." >&2
+            exit 1
+          }
           [[ -z "$EXPECTED_SHA" || "$revision" == "$EXPECTED_SHA" ]] || {
             echo "Image revision $revision does not match expected source $EXPECTED_SHA." >&2
             exit 1
@@ -204,8 +210,7 @@ jobs:
               health="$(rev properties.healthState)"
               replicas="$(az containerapp replica count -n "$app" -g "$RESOURCE_GROUP" --revision "$new_revision" -o tsv --only-show-errors || echo 0)"
               if [[ "$provisioning" == 'Failed' || "$health" == 'Unhealthy' ]]; then
-                echo "$app revision $new_revision failed: provisioning=$provisioning health=$health." >&2
-                echo "Rollback: rerun this workflow with image-ref=$previous_image" >&2
+                echo "$app revision $new_revision failed: provisioning=$provisioning health=$health. Previous image: $previous_image" >&2
                 exit 1
               fi
               if [[ "$provisioning" == 'Provisioned' && "$health" != 'Unhealthy' ]] && \
