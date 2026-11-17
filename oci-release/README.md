@@ -1,4 +1,4 @@
-# OCI release golden path (EN-45 / INFRA-396)
+# OCI release: build once, promote by digest (EN-45 / INFRA-396)
 
 Two reusable workflows turn a container release into: **build once → publish an immutable digest → promote that
 same digest through Alpha, Beta and Prod → roll back to a retained digest**. They complement the

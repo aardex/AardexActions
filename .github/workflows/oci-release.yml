@@ -1,10 +1,10 @@
-name: OCI golden path CI
+name: OCI release CI
 on:
   pull_request:
-    paths: [.github/workflows/oci-*.yml, oci-golden-path/**, release-management/manifest.py, release-management/release-manifest.schema.json]
+    paths: [.github/workflows/oci-*.yml, oci-release/**, release-management/manifest.py, release-management/release-manifest.schema.json]
   push:
     branches: [main]
-    paths: [.github/workflows/oci-*.yml, oci-golden-path/**, release-management/manifest.py, release-management/release-manifest.schema.json]
+    paths: [.github/workflows/oci-*.yml, oci-release/**, release-management/manifest.py, release-management/release-manifest.schema.json]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
       - name: Run workflow step and manifest compatibility tests
         run: |
           python3 -m pip install -r release-management/requirements-ci.txt
-          python3 -m unittest discover -s oci-golden-path/tests -v
+          python3 -m unittest discover -s oci-release/tests -v
       - name: Validate reusable workflows and example with pinned actionlint
         env:
           ACTIONLINT_TEMP: ${{ runner.temp }}/oci-actionlint
@@ -34,4 +34,4 @@ jobs:
           printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' \
             "$ACTIONLINT_TEMP/actionlint.tar.gz" | sha256sum --check
           tar -xzf "$ACTIONLINT_TEMP/actionlint.tar.gz" -C "$ACTIONLINT_TEMP" actionlint
-          "$ACTIONLINT_TEMP/actionlint" .github/workflows/oci-*.yml oci-golden-path/examples/*.yml
+          "$ACTIONLINT_TEMP/actionlint" .github/workflows/oci-*.yml oci-release/examples/*.yml
