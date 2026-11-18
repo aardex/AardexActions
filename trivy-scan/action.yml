@@ -1,0 +1,103 @@
+name: Trivy filesystem scan
+description: Scan a checked-out repository for vulnerabilities, secrets and misconfiguration, and retain a private SARIF report
+
+inputs:
+  scan-ref:
+    description: Filesystem directory to scan
+    required: false
+    default: '.'
+  scanners:
+    description: Comma-separated scanners
+    required: false
+    default: vuln,secret,misconfig
+  severity:
+    description: Reported severities (check the impact on secret visibility)
+    required: false
+    default: HIGH,CRITICAL
+  config-file:
+    description: Optional project-specific Trivy YAML (relative to the checkout)
+    required: false
+    default: ''
+  ignore-file:
+    description: Optional project-specific Trivy YAML exceptions file (relative to the checkout)
+    required: false
+    default: ''
+  skip-dirs:
+    description: Comma-separated paths excluded from filesystem scanning
+    required: false
+    default: '.git,.terraform,.security-reports'
+  exit-code:
+    description: Exit code on findings; tool failures must still fail
+    required: false
+    default: '0'
+  artifact-name:
+    description: Private GitHub Actions artifact name
+    required: false
+    default: trivy-sarif
+  retention-days:
+    description: Artifact retention in days
+    required: false
+    default: '7'
+
+runs:
+  using: composite
+  steps:
+    - name: Check optional configuration files
+      id: config
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config-file }}
+        IGNORE: ${{ inputs.ignore-file }}
+      run: |
+        set -euo pipefail
+        for value in "$CONFIG" "$IGNORE"; do
+          if [[ -n "$value" ]]; then
+            [[ -f "$value" && "$value" != *$'\n'* && "$value" != *$'\r'* ]] || {
+              echo '::error::Trivy config-file/ignore-file must name existing checkout files.' >&2; exit 1;
+            }
+          fi
+        done
+        echo "config=$CONFIG" >> "$GITHUB_OUTPUT"
+        echo "ignore=$IGNORE" >> "$GITHUB_OUTPUT"
+
+    - name: Scan with Trivy
+      id: scan
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+      with:
+        version: v0.70.0
+        scan-type: fs
+        scan-ref: ${{ inputs.scan-ref }}
+        scanners: ${{ inputs.scanners }}
+        severity: ${{ inputs.severity }}
+        trivy-config: ${{ steps.config.outputs.config }}
+        trivyignores: ${{ steps.config.outputs.ignore }}
+        skip-dirs: ${{ inputs.skip-dirs }}
+        format: sarif
+        output: trivy-results.sarif
+        exit-code: ${{ inputs.exit-code }}
+        limit-severities-for-sarif: true
+
+    - name: Summarize rule IDs and counts
+      if: ${{ !cancelled() && hashFiles('trivy-results.sarif') != '' }}
+      shell: bash
+      run: python3 "$GITHUB_ACTION_PATH/../scripts/sarif_summary.py" trivy-results.sarif Trivy
+
+    - name: Keep report for review
+      if: ${{ !cancelled() && hashFiles('trivy-results.sarif') != '' }}
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: trivy-results.sarif
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: error
+
+    - name: Verify report and restore Trivy exit status
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        SCAN_OUTCOME: ${{ steps.scan.outcome }}
+      run: |
+        set -euo pipefail
+        test -s trivy-results.sarif || { echo '::error::Trivy did not generate SARIF.'; exit 1; }
+        [[ "$SCAN_OUTCOME" == success ]] || { echo '::error::Trivy failed; inspect scanner logs.'; exit 1; }
