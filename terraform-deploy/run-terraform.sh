@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Terraform diagnostics may be sensitive; failed pre-apply stages publish a bounded stderr excerpt.
+# Terraform diagnostics may be sensitive; failed stages publish a bounded stderr excerpt.
 case "${1:-}" in
   init)
     stage=init; output=init-result.txt
@@ -22,9 +22,7 @@ umask 077
 # Replace any prior captured output so an existing file cannot retain permissive modes.
 output_ready=false
 diagnostic_file=''
-if [[ "$stage" != apply ]]; then
-  diagnostic_file=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/terraform-diagnostic.XXXXXXXX" 2>/dev/null) || diagnostic_file=''
-fi
+diagnostic_file=$(mktemp "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/terraform-diagnostic.XXXXXXXX" 2>/dev/null) || diagnostic_file=''
 trap '[[ -z "$diagnostic_file" ]] || rm -f -- "$diagnostic_file"' EXIT
 if rm -f -- "$output" 2>/dev/null; then
   output_ready=true
