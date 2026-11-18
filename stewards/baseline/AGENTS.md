@@ -1,21 +1,17 @@
 # Agent guidance
 
-<!-- Copied from aardex/AardexActions stewards/baseline. Adapt the paths below. -->
+<!-- EN-51 baseline. Keep only facts specific to this repository. -->
 
 ## Documentation
 
-- Repository documentation starts at `README.md`; maintainer documentation lives in `docs/`.
-- Version-specific documentation for this component changes in the same PR as the code,
-  configuration or infrastructure that makes it necessary.
-- Cross-project, Confluence and controlled (QMS) documentation is routed, not copied: follow
-  the [Documentation Policy](https://github.com/aardex/AardexTechnicalDocumentation/blob/main/documentation/documentation-policy.md).
+- Entry point: `README.md`; maintainer documentation: `docs/` (adapt).
+- Documentation checks: <repository command, if any>.
+- Release files and the managed Release PR are written only by the shared release engine
+  (if adopted); see `docs/release.md` (adapt).
 
-## Documentation and release assistance
+## Shared assistance
 
-- Documentation impact of a change: use the `aardex-doc-impact` skill.
-- Release readiness of a Release PR or release: use the `aardex-release-readiness` skill.
-- If the skills are not installed, read and follow
-  `https://github.com/aardex/AardexActions/blob/main/stewards/doc-impact/SKILL.md` or
-  `https://github.com/aardex/AardexActions/blob/main/stewards/release-readiness/SKILL.md`.
-- Both are advisory. Never modify release evidence (`version.txt`, `CHANGELOG.md` release
-  sections, `.release/*`), approvals or Release PRs.
+For documentation impact or release readiness, use the `aardex-doc-impact` and
+`aardex-release-readiness` skills from
+[aardex/AardexActions `stewards/`](https://github.com/aardex/AardexActions/tree/main/stewards)
+(installation, rules and fallback there).

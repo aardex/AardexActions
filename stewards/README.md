@@ -75,14 +75,19 @@ instructions here need no change.
 
 ## New-repository baseline (EN-51)
 
-No organisation repository template exists yet. Until one does, new repositories copy
-[`baseline/`](baseline/):
+Shared conventions come from native mechanisms, not copies:
 
-- `AGENTS.md` and `CLAUDE.md` — tell any agent where the repository documentation lives and
-  that documentation impact and release readiness use these skills;
-- `.github/pull_request_template.md` — the standard's *Documentation impact* declaration.
+- **PR template** (*Documentation impact* declaration): an organisation default in
+  `aardex/.github` (`.github/pull_request_template.md`). GitHub applies it to every repository
+  without its own template, which only repository-specific exceptions should add.
+- **Agent rules**: these skills. A repository's `AGENTS.md` keeps only its own documentation
+  locations, commands and constraints, plus a one-line reference to this directory; copy
+  [`baseline/AGENTS.md`](baseline/AGENTS.md) and adapt it. `CLAUDE.md` contains only
+  `@AGENTS.md` (Claude Code imports it; Codex reads `AGENTS.md` natively).
 
-Adapt paths to the repository; do not add empty documentation files to satisfy a checklist.
+Agents find the skills either through the per-user installation above or, when they are
+not installed, by following the `AGENTS.md` reference and reading the `SKILL.md` from GitHub.
+Do not add empty documentation files to satisfy a checklist.
 
 ## Limitations
 
