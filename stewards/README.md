@@ -23,6 +23,7 @@ Link the directories from a local clone of this repository so `git pull` keeps t
 
 ```bash
 git clone https://github.com/aardex/AardexActions.git ~/src/AardexActions   # or reuse an existing clone
+mkdir -p ~/.claude/skills ~/.codex/skills
 for s in doc-impact release-readiness; do
   ln -sfn ~/src/AardexActions/stewards/$s ~/.claude/skills/aardex-$s   # Claude Code
   ln -sfn ~/src/AardexActions/stewards/$s ~/.codex/skills/aardex-$s    # Codex
