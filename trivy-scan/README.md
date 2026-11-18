@@ -1,6 +1,6 @@
 # Trivy filesystem scan
 
-Composite action for a checked-out repository. Defaults: `fs .`, `vuln,secret,misconfig`, `HIGH,CRITICAL`, Trivy `v0.70.0`, SARIF artifact `trivy-sarif` (7 days), `exit-code: '0'` on findings. Operational errors and missing SARIF still fail. No `security/` directory, cloud credentials or GitHub Code Scanning is required. The job summary lists rule IDs/counts, not source snippets; SARIF can contain sensitive findings and must remain private. The action uses pinned `aquasecurity/trivy-action` revision `a9c7b0f…`.
+Composite action for a checked-out repository. Defaults: `fs .`, `vuln,secret,misconfig`, `HIGH,CRITICAL`, Trivy `v0.70.0`, SARIF artifact `trivy-sarif` (7 days), `exit-code: '0'` on findings. Operational errors and missing SARIF still fail. Without optional inputs, the action generates an explicit empty Trivy config (`{}`) and an empty YAML ignore list: existing `trivy.yaml` or `.trivyignore` files cannot silently change or suppress the scan. No `security/` directory, cloud credentials or GitHub Code Scanning is required. The job summary lists rule IDs/counts, not source snippets; SARIF can contain sensitive findings and must remain private. The action uses pinned `aquasecurity/trivy-action` revision `a9c7b0f…`.
 
 ```yaml
 jobs:
@@ -24,4 +24,4 @@ with:
   ignore-file: security/trivyignore.yaml
 ```
 
-Both files are optional; a **specified but missing** file fails. `scan-ref`, `scanners`, `severity`, `skip-dirs`, `exit-code`, `artifact-name`, `retention-days` are optional inputs. CLI inputs override matching config values. No ignore file means **no suppressed findings**; never add a secret finding to an ignore file instead of handling the incident. Severity filtering may hide some secrets; review scanner behavior before treating this as exhaustive. `fs` does not inspect image layers; the existing `azure-container-app-deploy` action separately scans a published image.
+Both files are optional; a **specified but missing** file fails. Existing implicit Trivy config/ignore files are not opt-in overrides: pass their path explicitly to use them. `scan-ref`, `scanners`, `severity`, `skip-dirs`, `exit-code`, `artifact-name`, `retention-days` are optional inputs. CLI inputs override matching config values. No ignore file means **no suppressed findings**; never add a secret finding to an ignore file instead of handling the incident. Severity filtering may hide some secrets; review scanner behavior before treating this as exhaustive. `fs` does not inspect image layers; the existing `azure-container-app-deploy` action separately scans a published image.

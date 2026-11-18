@@ -42,7 +42,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check optional configuration files
+    - name: Resolve explicit Trivy configuration and ignore list
       id: config
       shell: bash
       env:
@@ -50,15 +50,10 @@ runs:
         IGNORE: ${{ inputs.ignore-file }}
       run: |
         set -euo pipefail
-        for value in "$CONFIG" "$IGNORE"; do
-          if [[ -n "$value" ]]; then
-            [[ -f "$value" && "$value" != *$'\n'* && "$value" != *$'\r'* ]] || {
-              echo '::error::Trivy config-file/ignore-file must name existing checkout files.' >&2; exit 1;
-            }
-          fi
-        done
-        echo "config=$CONFIG" >> "$GITHUB_OUTPUT"
-        echo "ignore=$IGNORE" >> "$GITHUB_OUTPUT"
+        config=$(bash "$GITHUB_ACTION_PATH/../scripts/resolve_scan_config.sh" trivy-config "$CONFIG")
+        ignore=$(bash "$GITHUB_ACTION_PATH/../scripts/resolve_scan_config.sh" trivy-ignore "$IGNORE")
+        echo "config=$config" >> "$GITHUB_OUTPUT"
+        echo "ignore=$ignore" >> "$GITHUB_OUTPUT"
 
     - name: Scan with Trivy
       id: scan

@@ -34,19 +34,16 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check optional configuration file
+    - name: Resolve explicit Checkov configuration
       id: config
       shell: bash
       env:
         CONFIG: ${{ inputs.config-file }}
+        SCAN_DIRECTORY: ${{ inputs.directory }}
       run: |
         set -euo pipefail
-        if [[ -n "$CONFIG" ]]; then
-          [[ -f "$CONFIG" && "$CONFIG" != *$'\n'* && "$CONFIG" != *$'\r'* ]] || {
-            echo '::error::Checkov config-file must name an existing checkout file.' >&2; exit 1;
-          }
-        fi
-        echo "path=$CONFIG" >> "$GITHUB_OUTPUT"
+        path=$(bash "$GITHUB_ACTION_PATH/../scripts/resolve_scan_config.sh" checkov "$CONFIG")
+        echo "path=$path" >> "$GITHUB_OUTPUT"
 
     - name: Scan with Checkov
       id: scan
