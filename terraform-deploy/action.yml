@@ -345,7 +345,7 @@ runs:
     # saved-apply action so it remains independent of the reviewed checkout.
     - name: Apply reviewed saved plan
       if: ${{ inputs.execution-mode == 'reviewed-apply' }}
-      uses: aardex/AardexActions/terraform-apply-saved@53c4effaa17146b2beb1e1c44f19f6c7667c63ea
+      uses: aardex/AardexActions/terraform-apply-saved@af5e84a40438273e9a71ac5ee49bec2f5de71c76
       with:
         azure-credentials: ${{ inputs.azure-credentials }}
         azure-subscription: ${{ inputs.azure-subscription }}
