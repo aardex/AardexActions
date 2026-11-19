@@ -14,7 +14,7 @@ The GitHub organization in the action references is `aardex`; this repository do
 | GitHub / versioning | [commit and push](github-commit-push/README.md), [commit version](commit-version-changes/README.md), [create tag and release](github-create-tag-release/README.md), [update version](github-version-update/README.md), [Copilot PR review request](copilot-pr-review/README.md) |
 | AI assistance (advisory, local agent) | [Documentation impact and release readiness skills](stewards/README.md) — Codex/Claude instructions; no gate or hosted AI run |
 | Terraform | [deploy](terraform-deploy/README.md), [destroy](terraform-destroy/README.md), [docs](terraform-docs/README.md), [docs index](terraform-docs-index/README.md), [format and validate](terraform-format-validate/README.md), [module directories](terraform-module-directories/README.md), [version update](terraform-version-update/README.md) |
-| Security scans | [Checkov filesystem/IaC scan](checkov-scan/README.md), [Trivy filesystem scan](trivy-scan/README.md) — manual or PR workflows in consumer repositories; no cloud credentials or Code Scanning required |
+| Security scans | [Checkov/Trivy adoption guide](docs/security-scans/README.md), [Checkov action](checkov-scan/README.md), [Trivy action](trivy-scan/README.md) — manual or PR workflows in consumer repositories; no cloud credentials or Code Scanning required |
 
 ## Maintainer guide
 

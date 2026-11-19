@@ -1,5 +1,7 @@
 # Checkov scan
 
+[Adoption guide for both scans, optional configuration and report interpretation](../docs/security-scans/README.md).
+
 Composite action for a checked-out repository. Defaults: full repository, all frameworks, **explicit generated config with `skip-check: []`**, SARIF artifact `checkov-sarif` (7 days), and **failure on findings**. Checkov **merges** auto-discovered configs even with `--config-file`, so an empty file alone is not sufficient: the action also fails closed if an unselected `.checkov.yaml` or `.checkov.yml` exists in the scan directory, working directory or home. Pass the discovered file explicitly as `config-file` to opt in, or remove it before scanning. It never needs Azure/Bridgecrew credentials and does not upload to GitHub Code Scanning. It uses pinned `bridgecrewio/checkov-action` revision `3f0caf0…` (container tag `ghcr.io/bridgecrewio/checkov:3.4.5`); review image provenance before a compliance gate. The metadata-only job summary lists rule IDs/counts. Scanner logs and SARIF may contain code/secret context: use only in private, access-controlled repositories.
 
 ```yaml
