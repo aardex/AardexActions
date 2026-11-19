@@ -1,0 +1,86 @@
+name: Checkov scan
+description: Scan a checked-out repository with Checkov and retain a private SARIF report
+
+inputs:
+  directory:
+    description: Directory to scan
+    required: false
+    default: '.'
+  framework:
+    description: Checkov framework selection
+    required: false
+    default: all
+  config-file:
+    description: Optional project-specific Checkov YAML file (relative to the checkout)
+    required: false
+    default: ''
+  skip-path:
+    description: Comma-separated paths/regular expressions to exclude generated files
+    required: false
+    default: '.terraform,.security-reports'
+  soft-fail:
+    description: Whether findings should leave the job green
+    required: false
+    default: 'false'
+  artifact-name:
+    description: Private GitHub Actions artifact name
+    required: false
+    default: checkov-sarif
+  retention-days:
+    description: Artifact retention in days
+    required: false
+    default: '7'
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve explicit Checkov configuration
+      id: config
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config-file }}
+        SCAN_DIRECTORY: ${{ inputs.directory }}
+      run: |
+        set -euo pipefail
+        path=$(bash "$GITHUB_ACTION_PATH/../scripts/resolve_scan_config.sh" checkov "$CONFIG")
+        echo "path=$path" >> "$GITHUB_OUTPUT"
+
+    - name: Scan with Checkov
+      id: scan
+      continue-on-error: true # Keep the report, then restore the scanner result.
+      uses: bridgecrewio/checkov-action@3f0caf0c3aa9f56ade6b49f6e60b63aaeafb75a3
+      with:
+        directory: ${{ inputs.directory }}
+        framework: ${{ inputs.framework }}
+        config_file: ${{ steps.config.outputs.path }}
+        output_format: cli,sarif
+        output_file_path: console,results.sarif
+        soft_fail: ${{ inputs.soft-fail }}
+        quiet: true
+        skip_results_upload: true
+        skip_download: true
+        skip_path: ${{ inputs.skip-path }}
+
+    - name: Summarize rule IDs and counts
+      if: ${{ !cancelled() && hashFiles('results.sarif') != '' }}
+      shell: bash
+      run: python3 "$GITHUB_ACTION_PATH/../scripts/sarif_summary.py" results.sarif Checkov
+
+    - name: Keep report for review
+      if: ${{ !cancelled() && hashFiles('results.sarif') != '' }}
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: results.sarif
+        retention-days: ${{ inputs.retention-days }}
+        if-no-files-found: error
+
+    - name: Verify report and restore Checkov exit status
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        SCAN_OUTCOME: ${{ steps.scan.outcome }}
+      run: |
+        set -euo pipefail
+        test -s results.sarif || { echo '::error::Checkov did not generate SARIF.'; exit 1; }
+        [[ "$SCAN_OUTCOME" == success ]] || { echo '::error::Checkov failed (findings or tool error); inspect the report and scanner logs.'; exit 1; }
