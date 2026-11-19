@@ -1,0 +1,76 @@
+# Reference consumer workflow: build once, promote the same digest Alpha -> Beta -> Prod.
+# Replace REVIEWED_MERGED_SHA with the merged AardexActions commit that contains the OCI workflows.
+name: Image release
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact commit to build (empty = this run's commit)
+        required: false
+        type: string
+      image_ref:
+        description: Promote/rollback an existing digest instead of building (registry/repo@sha256:...)
+        required: false
+        type: string
+      target:
+        description: Last environment to promote to
+        required: true
+        type: choice
+        options: [alpha, beta, prod]
+        default: alpha
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: image-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: inputs.image_ref == ''
+    uses: aardex/AardexActions/.github/workflows/oci-publish.yml@REVIEWED_MERGED_SHA
+    with:
+      image-name: example-api
+      dockerfile: docker/Dockerfile
+      source-ref: ${{ inputs.source_sha }}
+      credential-environment: alpha
+      nuget-secret: true
+    secrets:
+      OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+      NUGET_PAT: ${{ secrets.PAT_TOKEN }}
+
+  alpha:
+    needs: publish
+    if: always() && (needs.publish.result == 'success' || (needs.publish.result == 'skipped' && inputs.image_ref != ''))
+    uses: aardex/AardexActions/.github/workflows/oci-promote-containerapp.yml@REVIEWED_MERGED_SHA
+    with:
+      environment: alpha
+      image-ref: ${{ needs.publish.outputs.image-ref || inputs.image_ref }}
+      container-apps: ca-example-api-${AZ_ENV}
+    secrets:
+      OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+
+  beta:
+    needs: [publish, alpha]
+    if: always() && needs.alpha.result == 'success' && inputs.target != 'alpha'
+    uses: aardex/AardexActions/.github/workflows/oci-promote-containerapp.yml@REVIEWED_MERGED_SHA
+    with:
+      environment: beta
+      image-ref: ${{ needs.publish.outputs.image-ref || inputs.image_ref }}
+      container-apps: ca-example-api-${AZ_ENV}
+    secrets:
+      OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+
+  prod:
+    needs: [publish, beta]
+    if: always() && needs.beta.result == 'success' && inputs.target == 'prod'
+    uses: aardex/AardexActions/.github/workflows/oci-promote-containerapp.yml@REVIEWED_MERGED_SHA
+    with:
+      environment: prod
+      image-ref: ${{ needs.publish.outputs.image-ref || inputs.image_ref }}
+      container-apps: ca-example-api-${AZ_ENV}
+      require-approval: true
+    secrets:
+      OP_CONNECT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
