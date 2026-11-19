@@ -28,6 +28,7 @@ class ApplySummaryTests(unittest.TestCase):
         self.env = dict(os.environ, PATH=str(self.root / 'bin') + os.pathsep + os.environ['PATH'],
                         ACTION_PATH=str(ACTION), ACTION_APPLY_PATH=str(ACTION.parent / 'terraform-apply-saved'),
                         GITHUB_OUTPUT=str(self.root / 'output'), GITHUB_STEP_SUMMARY=str(self.root / 'summary'),
+                        RUNNER_TEMP=str(self.root),
                         FIXTURE_STDOUT='synthetic-success', FIXTURE_STDERR='synthetic-error <bad>&',
                         FIXTURE_EXIT='0', APPLY_ENVIRONMENT='alpha', APPLY_COMMIT='a' * 40,
                         APPLY_PLAN_ID='fixture/plan', APPLY_SUMMARY_MODE='human-readable', APPLY_OUTPUT_READY='true')
@@ -65,6 +66,20 @@ class ApplySummaryTests(unittest.TestCase):
         summary = (self.root / 'summary').read_text()
         self.assertIn('5 added, 7 changed, 1 destroyed', summary)
         self.assertNotIn('synthetic-secret', summary)
+
+    def test_failed_apply_publishes_only_bounded_stderr_in_default_mode(self):
+        result = self.bash('bash "$ACTION_PATH/run-terraform.sh" apply terraform apply',
+                           FIXTURE_EXIT='17', FIXTURE_STDERR='discarded' + '&' * 33000 + '<failure>',
+                           APPLY_SUMMARY_MODE='counts-only')
+        self.assertEqual(result.returncode, 17)
+        summary = (self.root / 'summary').read_text()
+        self.assertIn('Diagnostic truncated to the last 32000 bytes', summary)
+        self.assertIn('&lt;failure&gt;', summary)
+        self.assertNotIn('discarded', summary)
+        self.assertNotIn('synthetic-success', summary)
+        self.assertNotIn('<failure>', summary)
+        self.assertNotIn('<failure>', result.stdout + result.stderr)
+        self.assertEqual(list(self.root.glob('terraform-diagnostic.*')), [])
 
     def test_truncates_to_bounded_tail_and_escapes(self):
         (self.root / 'apply-result.txt').write_text('discarded-marker' + '&' * 200000 + '<actual-error>')

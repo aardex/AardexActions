@@ -372,7 +372,7 @@ esac
             step = MANIFEST.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
             self.assertIn("inputs.execution-mode != 'reviewed-apply'", step)
         self.assertIn("inputs.execution-mode == 'legacy' && steps.plan.outcome", MANIFEST)
-        self.assertIn('terraform-apply-saved@53c4effaa17146b2beb1e1c44f19f6c7667c63ea', MANIFEST)
+        self.assertIn('terraform-apply-saved@af5e84a40438273e9a71ac5ee49bec2f5de71c76', MANIFEST)
         self.assertIn('apply-summary-mode: ${{ inputs.apply-summary-mode }}', MANIFEST)
         self.assertIn('ref: ${{ steps.reviewed_plan.outputs.commit }}', MANIFEST)
         self.assertIn('plan-sha256: ${{ steps.reviewed_plan.outputs.sha256 }}', MANIFEST)
