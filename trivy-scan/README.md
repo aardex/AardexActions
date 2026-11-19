@@ -1,5 +1,7 @@
 # Trivy filesystem scan
 
+[Adoption guide for both scans, optional configuration and report interpretation](../docs/security-scans/README.md).
+
 Composite action for a checked-out repository. Defaults: `fs .`, `vuln,secret,misconfig`, `HIGH,CRITICAL`, Trivy `v0.70.0`, SARIF artifact `trivy-sarif` (7 days), `exit-code: '0'` on findings. Operational errors and missing SARIF still fail. Without optional inputs, the action generates an explicit empty Trivy config (`{}`) and an empty YAML ignore list: existing `trivy.yaml` or `.trivyignore` files cannot silently change or suppress the scan. No `security/` directory, cloud credentials or GitHub Code Scanning is required. The job summary lists rule IDs/counts, not source snippets; SARIF can contain sensitive findings and must remain private. The action uses pinned `aquasecurity/trivy-action` revision `a9c7b0f…`.
 
 ```yaml
