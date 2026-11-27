@@ -1,0 +1,290 @@
+name: OCI promote to Container Apps
+
+# Reusable workflow (EN-45). Deploys an already published, content-addressed image to Azure Container Apps in one
+# GitHub Environment. It never builds. The GitHub Environment's protection rules provide the human approval; with
+# require-approval the workflow also proves, from GitHub's own record, that this run was approved for this
+# environment before anything changes, and writes who approved which digest into the promotion record.
+# Rollback is the same workflow with the previous digest from an earlier promotion record.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment (alpha, beta, prod); its variables supply AZ_RG/AZ_ENV and the credential
+        required: true
+        type: string
+      image-ref:
+        description: <registry>/<repository>@sha256:<digest> returned by oci-publish
+        required: true
+        type: string
+      container-apps:
+        description: Newline-separated Container App names. ${AZ_ENV} is replaced by the environment variable AZ_ENV.
+        required: true
+        type: string
+      resource-group:
+        description: Resource group; empty uses the environment variable AZ_RG
+        required: false
+        type: string
+        default: ''
+      expected-registry:
+        description: Only images from this registry may be promoted
+        required: false
+        type: string
+        default: acradxinframgmeun.azurecr.io
+      expected-source-sha:
+        description: Optional source SHA the image revision label must match (for example the release tag SHA)
+        required: false
+        type: string
+        default: ''
+      require-approval:
+        description: Fail before any change unless GitHub recorded an approval of this run for this environment
+        required: false
+        type: boolean
+        default: false
+      wait-for-replicas:
+        description: Require at least one running replica of the new revision (disable for scale-to-zero apps)
+        required: false
+        type: boolean
+        default: true
+      runs-on:
+        description: JSON runs-on value; the private group reads the registry over Private Link
+        required: false
+        type: string
+        default: '{"group":"aardex"}'
+    secrets:
+      OP_CONNECT_TOKEN:
+        description: 1Password service account token resolving the existing Azure automation credential
+        required: true
+    outputs:
+      record:
+        description: JSON promotion record (environment, digest, approvals, previous and new revisions)
+        value: ${{ jobs.promote.outputs.record }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 45
+    concurrency:
+      group: oci-promote-${{ github.repository }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    outputs:
+      record: ${{ steps.record.outputs.record }}
+    steps:
+      - name: Validate the image reference
+        id: ref
+        env:
+          IMAGE_REF: ${{ inputs.image-ref }}
+          EXPECTED_REGISTRY: ${{ inputs.expected-registry }}
+          EXPECTED_SHA: ${{ inputs.expected-source-sha }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_REF" =~ ^([a-z0-9]+\.azurecr\.io)/([a-z0-9]+([._/-][a-z0-9]+)*)@(sha256:[0-9a-f]{64})$ ]] || {
+            echo 'image-ref must be <registry>.azurecr.io/<repository>@sha256:<64 hex>; tags are not promotable.' >&2
+            exit 1
+          }
+          registry="${BASH_REMATCH[1]}"; repository="${BASH_REMATCH[2]}"; digest="${BASH_REMATCH[4]}"
+          [[ "$registry" == "$EXPECTED_REGISTRY" ]] || { echo "Registry $registry is not the shared registry $EXPECTED_REGISTRY." >&2; exit 1; }
+          [[ -z "$EXPECTED_SHA" || "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'expected-source-sha must be a full SHA.' >&2; exit 1; }
+          {
+            echo "registry=$registry"
+            echo "repository=$repository"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prove the environment approval of this run
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUIRED: ${{ inputs.require-approval }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          RUN_URL: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/approvals
+        run: |
+          set -euo pipefail
+          approvals="$(gh api "$RUN_URL" | jq -c --arg env "$ENVIRONMENT" \
+            '[.[] | select(.state == "approved") | select(any(.environments[]; (.name | ascii_downcase) == ($env | ascii_downcase))) | {user: .user.login, comment: .comment}]')"
+          echo "approvals=$approvals" >> "$GITHUB_OUTPUT"
+          if [[ "$REQUIRED" == 'true' && "$(jq length <<<"$approvals")" -lt 1 ]]; then
+            echo "No recorded human approval for environment '$ENVIRONMENT' in this run." >&2
+            echo 'Configure required reviewers on the GitHub Environment; promotion stops before any change.' >&2
+            exit 1
+          fi
+
+      - name: Load Azure automation credential
+        uses: 1password/load-secrets-action@581a835fb51b8e7ec56b71cf2ffddd7e68bb25e0 # v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_CONNECT_TOKEN }}
+          AZ_CRED: op://${{ vars.OP_ADMIN_VAULT_NAME }}/${{ vars.AZ_APPR }}/notes
+
+      - name: Sign in to Azure and the registry
+        env:
+          REGISTRY: ${{ steps.ref.outputs.registry }}
+          SUBSCRIPTION: ${{ vars.AZ_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          client_id="$(jq -r .clientId <<<"$AZ_CRED")"
+          tenant_id="$(jq -r .tenantId <<<"$AZ_CRED")"
+          client_secret="$(jq -r .clientSecret <<<"$AZ_CRED")"
+          echo "::add-mask::$client_secret"
+          az login --service-principal --username "$client_id" --password "$client_secret" --tenant "$tenant_id" --output none --only-show-errors
+          [[ -z "$SUBSCRIPTION" ]] || az account set --subscription "$SUBSCRIPTION"
+          az acr login --name "${REGISTRY%%.*}" --only-show-errors
+          az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors > /dev/null
+
+      - name: Verify the published digest and its provenance label
+        id: verify
+        env:
+          IMAGE_REF: ${{ inputs.image-ref }}
+          EXPECTED_SHA: ${{ inputs.expected-source-sha }}
+          EXPECTED_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          config="$(docker buildx imagetools inspect "$IMAGE_REF" --format '{{json .Image}}')" || {
+            echo "$IMAGE_REF is not available in the shared registry." >&2
+            exit 1
+          }
+          revision="$(jq -r '.config.Labels["org.opencontainers.image.revision"] // empty' <<<"$config")"
+          source="$(jq -r '.config.Labels["org.opencontainers.image.source"] // empty' <<<"$config")"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Image has no source revision label; publish it with oci-publish.' >&2; exit 1; }
+          [[ "$source" == "$EXPECTED_SOURCE" ]] || {
+            echo "Image was built from '${source:-unknown}', not $EXPECTED_SOURCE; refusing to promote another repository's image." >&2
+            exit 1
+          }
+          [[ -z "$EXPECTED_SHA" || "$revision" == "$EXPECTED_SHA" ]] || {
+            echo "Image revision $revision does not match expected source $EXPECTED_SHA." >&2
+            exit 1
+          }
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+      - name: Roll out the digest and wait for health
+        id: rollout
+        env:
+          IMAGE_REF: ${{ inputs.image-ref }}
+          REGISTRY: ${{ steps.ref.outputs.registry }}
+          APPS: ${{ inputs.container-apps }}
+          RESOURCE_GROUP: ${{ inputs.resource-group || vars.AZ_RG }}
+          AZ_ENV: ${{ vars.AZ_ENV }}
+          WAIT_FOR_REPLICAS: ${{ inputs.wait-for-replicas }}
+        run: |
+          set -euo pipefail
+          [[ -n "$RESOURCE_GROUP" ]] || { echo 'No resource group (input or AZ_RG).' >&2; exit 1; }
+          results='[]'
+          apps=()
+          while IFS= read -r app; do apps+=("$app"); done < <(printf '%s\n' "$APPS" | sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*$/d' -e "s/\${AZ_ENV}/$AZ_ENV/g")
+          [[ "${#apps[@]}" -gt 0 ]] || { echo 'No Container Apps given.' >&2; exit 1; }
+
+          # Snapshot all apps before any mutation, then retain each transition even if a command fails.
+          save_results() { echo "apps=$results" >> "$GITHUB_OUTPUT"; }
+          for app in "${apps[@]}"; do
+            servers="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query 'properties.configuration.registries[].server' -o tsv --only-show-errors)"
+            grep -qxF "$REGISTRY" <<<"$servers" || {
+              echo "$app has no registry entry for $REGISTRY. Apply the workload Terraform that grants AcrPull and configures the shared registry first." >&2
+              exit 1
+            }
+            previous_revision="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query properties.latestRevisionName -o tsv --only-show-errors)"
+            previous_image="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query 'properties.template.containers[0].image' -o tsv --only-show-errors)"
+            results="$(jq -c --arg app "$app" --arg pr "$previous_revision" --arg pi "$previous_image" \
+              '. + [{app:$app, previous_revision:$pr, previous_image:$pi, revision:"", health:"", replicas:"", status:"pending"}]' <<<"$results")"
+            save_results
+          done
+
+          index=0
+          for app in "${apps[@]}"; do
+            show() { az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query "$1" -o tsv --only-show-errors; }
+            previous_revision="$(jq -r --argjson i "$index" '.[$i].previous_revision' <<<"$results")"
+            previous_image="$(jq -r --argjson i "$index" '.[$i].previous_image' <<<"$results")"
+            results="$(jq -c --argjson i "$index" '.[$i].status = "updating"' <<<"$results")"
+            save_results
+            az containerapp update -n "$app" -g "$RESOURCE_GROUP" --image "$IMAGE_REF" --only-show-errors --output none
+
+            new_revision="$(show properties.latestRevisionName)"
+            results="$(jq -c --argjson i "$index" --arg revision "$new_revision" '.[$i].revision = $revision | .[$i].status = "updated"' <<<"$results")"
+            save_results
+            new_image="$(show 'properties.template.containers[0].image')"
+            [[ "$new_image" == "$IMAGE_REF" ]] || { echo "$app did not retain $IMAGE_REF." >&2; exit 1; }
+            if [[ "$previous_image" != "$IMAGE_REF" && "$new_revision" == "$previous_revision" ]]; then
+              echo "$app did not create a revision for the new digest." >&2
+              exit 1
+            fi
+
+            healthy=false
+            for _ in $(seq 1 60); do
+              rev() { az containerapp revision show -n "$app" -g "$RESOURCE_GROUP" --revision "$new_revision" --query "$1" -o tsv --only-show-errors; }
+              provisioning="$(rev properties.provisioningState)"
+              health="$(rev properties.healthState)"
+              replicas="$(az containerapp replica count -n "$app" -g "$RESOURCE_GROUP" --revision "$new_revision" -o tsv --only-show-errors || echo 0)"
+              results="$(jq -c --argjson i "$index" --arg p "$provisioning" --arg h "$health" --arg r "$replicas" \
+                '.[$i].provisioning = $p | .[$i].health = $h | .[$i].replicas = $r' <<<"$results")"
+              save_results
+              if [[ "$provisioning" == 'Failed' || "$health" == 'Unhealthy' ]]; then
+                echo "$app revision $new_revision failed: provisioning=$provisioning health=$health. Previous image: $previous_image" >&2
+                exit 1
+              fi
+              if [[ "$provisioning" == 'Provisioned' && "$health" == 'Healthy' ]] && \
+                 { [[ "$WAIT_FOR_REPLICAS" != 'true' ]] || [[ "$replicas" =~ ^[1-9][0-9]*$ ]]; }; then
+                healthy=true
+                break
+              fi
+              sleep 10
+            done
+            "$healthy" || { echo "$app revision $new_revision was not healthy within 10 minutes. Previous image: $previous_image" >&2; exit 1; }
+            results="$(jq -c --argjson i "$index" '.[$i].status = "healthy"' <<<"$results")"
+            save_results
+            index=$((index + 1))
+          done
+
+      - name: Write the promotion record
+        id: record
+        if: always() && steps.verify.outcome == 'success'
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          IMAGE_REF: ${{ inputs.image-ref }}
+          DIGEST: ${{ steps.ref.outputs.digest }}
+          REVISION: ${{ steps.verify.outputs.revision }}
+          SOURCE: ${{ steps.verify.outputs.source }}
+          APPROVALS: ${{ steps.approval.outputs.approvals || '[]' }}
+          APPS: ${{ steps.rollout.outputs.apps || '[]' }}
+          OUTCOME: ${{ steps.rollout.outcome }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          ACTOR: ${{ github.triggering_actor }}
+        run: |
+          set -euo pipefail
+          record="$(jq -cn --arg env "$ENVIRONMENT" --arg ref "$IMAGE_REF" --arg digest "$DIGEST" --arg rev "$REVISION" \
+            --arg source "$SOURCE" --argjson approvals "$APPROVALS" --argjson apps "$APPS" --arg outcome "$OUTCOME" \
+            --arg run "$RUN" --arg actor "$ACTOR" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{schema:"aardex.oci-promotion/v1", environment:$env, image_ref:$ref, digest:$digest, source_sha:$rev,
+              source_repository:$source, outcome:$outcome, approvals:$approvals, triggered_by:$actor, run:$run,
+              recorded_at:$at, apps:$apps}')"
+          echo "record=$record" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$record" > promotion-record.json
+          {
+            echo "## OCI promotion — \`$ENVIRONMENT\` ($OUTCOME)"
+            echo
+            echo "- Image: \`$IMAGE_REF\` (source \`$REVISION\`)"
+            echo "- Approvals: \`$(jq -c . <<<"$APPROVALS")\`"
+            echo
+            echo '| App | Status | Previous image | New revision | Health | Replicas |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '.[] | "| \(.app) | \(.status) | `\(.previous_image)` | `\(.revision)` | \(.health) | \(.replicas) |"' <<<"$APPS"
+            echo
+            echo 'Rollback: rerun this workflow for this environment with a previous image-ref above.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain the promotion record
+        if: always() && steps.record.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: oci-promotion-${{ inputs.environment }}-${{ github.run_attempt }}
+          path: promotion-record.json
+          retention-days: 90
+
+      - name: Sign out
+        if: always()
+        run: az logout || true
