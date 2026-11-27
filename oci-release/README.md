@@ -19,7 +19,13 @@ same digest through Alpha, Beta and Prod → roll back to a retained digest**. T
   change (EN-45: missing approval cannot silently deploy). The approver logins go into the promotion record.
 - **Traceability**: source SHA (image label) → digest → environment → approvers → run URL → previous/new revision
   in the job summary and the `oci-promotion-<env>-<attempt>` artifact (90 days). GitHub also records each
-  environment deployment.
+  environment deployment. The record snapshots every app before updates and records progress after each operation;
+  `updating` means the update may have taken effect even if the command failed. An interrupted runner may prevent
+  artifact upload, so check Azure directly when no record is available.
+- **Health**: a revision must be `Provisioned` and report `Healthy`; by default at least one replica is also
+  required. `wait-for-replicas: false` removes only the replica requirement for scale-to-zero, not the positive
+  health requirement. A stopped revision that never reports `Healthy` times out; trigger it or validate separately.
+  This check is not an application-level API test.
 - **Rollback**: rerun promote with `image-ref` set to the previous shared-registry digest from the promotion record.
   Published digests are locked and the shared registry has no untagged-manifest retention, so they stay available.
   A caller that chains Alpha → Beta → Prod also re-promotes the lower environments when rolling Prod back; that is
@@ -81,3 +87,9 @@ automation principal (`AZ_APPR`) is the only identity with `AcrPush`; runtime id
 - `vulnerability-gate` defaults to `report` to keep current consumer behaviour; set `block` to enforce.
 - Container Apps only. Terraform-owned images (images set by `acr_docker_image` in workload Terraform) must first
   move image ownership to promotion — see the adoption PRs.
+
+## Local validation
+
+Install `release-management/requirements-ci.txt` in a virtual environment, then run
+`python -m unittest discover -s oci-release/tests -v`. Workflow step tests use temporary local fixtures
+and fake Azure CLI, GitHub CLI and Docker executables; they do not contact Azure or a registry.

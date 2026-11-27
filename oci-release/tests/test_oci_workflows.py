@@ -43,7 +43,7 @@ class Step(unittest.TestCase):
     def run_step(self, workflow, name, **env):
         environ = {'PATH': f'{self.dir}:{os.environ["PATH"]}', 'GITHUB_OUTPUT': str(self.output), **env}
         return subprocess.run(['bash', '-e', '-c', step(workflow, name)], env=environ,
-                              capture_output=True, text=True, timeout=30)
+                              capture_output=True, text=True, timeout=30, cwd=self.dir)
 
     def outputs(self):
         return dict(line.split('=', 1) for line in self.output.read_text().splitlines())
@@ -96,6 +96,73 @@ class Promote(Step):
                                  (good, 'c' * 40)]:
             with self.subTest(labels=labels, expected=expected):
                 self.assertNotEqual(0, self.verify(labels, expected_sha=expected).returncode)
+
+    def rollout(self, health_sequence, fail_app='', wait='true'):
+        # All Azure commands are replaced by a stateful local executable.
+        fake = self.dir / 'az'
+        fake.write_text("""#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+args = sys.argv[1:]
+state_file = Path(os.environ['FAKE_STATE'])
+state = json.loads(state_file.read_text()) if state_file.exists() else {'updated': [], 'health_calls': 0}
+app = args[args.index('-n') + 1]
+query = args[args.index('--query') + 1] if '--query' in args else ''
+if args[:2] == ['containerapp', 'update']:
+    state['updated'].append(app)
+    state_file.write_text(json.dumps(state))
+    if app == os.environ['FAIL_APP']:
+        sys.exit(1)
+elif args[:3] == ['containerapp', 'revision', 'show']:
+    if query == 'properties.healthState':
+        states = json.loads(os.environ['HEALTH_SEQUENCE'])
+        print(states[min(state['health_calls'], len(states) - 1)])
+        state['health_calls'] += 1
+        state_file.write_text(json.dumps(state))
+    elif query == 'properties.provisioningState': print('Provisioned')
+    elif query == 'properties.runningState': print('Running')
+elif args[:3] == ['containerapp', 'replica', 'count']: print('1')
+elif 'registries' in query: print(os.environ['REGISTRY'])
+elif query == 'properties.latestRevisionName': print(app + ('-new' if app in state['updated'] else '-old'))
+elif 'containers[0].image' in query: print(os.environ['IMAGE_REF'] if app in state['updated'] else app + '-old-image')
+""")
+        fake.chmod(0o755)
+        self.fake('sleep', '')
+        return self.run_step(self.WF, 'Roll out the digest and wait for health', IMAGE_REF=REF,
+                             REGISTRY=REGISTRY, APPS='app-a\napp-b', RESOURCE_GROUP='fixture', AZ_ENV='test',
+                             WAIT_FOR_REPLICAS=wait, FAKE_STATE=str(self.dir / 'state'), FAIL_APP=fail_app,
+                             HEALTH_SEQUENCE=json.dumps(health_sequence))
+
+    def test_partial_failure_preserves_previous_state_and_progress(self):
+        result = self.rollout(['Healthy'], fail_app='app-b')
+        self.assertNotEqual(0, result.returncode)
+        apps = json.loads(self.outputs()['apps'])
+        self.assertEqual(['app-a', 'app-b'], [app['app'] for app in apps])
+        self.assertEqual('app-a-old-image', apps[0]['previous_image'])
+        self.assertEqual('app-a-new', apps[0]['revision'])
+        self.assertEqual('app-b-old-image', apps[1]['previous_image'])
+        self.assertEqual('app-b-old', apps[1]['previous_revision'])
+        self.assertEqual('updating', apps[1]['status'])
+        record = self.run_step(self.WF, 'Write the promotion record', ENVIRONMENT='test', IMAGE_REF=REF,
+                               DIGEST=DIGEST, REVISION=SHA, SOURCE=REPO_URL, APPROVALS='[]',
+                               APPS=json.dumps(apps), OUTCOME='failure', RUN='https://example.test/run',
+                               ACTOR='tester', GITHUB_STEP_SUMMARY=str(self.dir / 'summary'))
+        self.assertEqual(0, record.returncode, record.stderr)
+        self.assertEqual(apps, json.loads((self.dir / 'promotion-record.json').read_text())['apps'])
+
+    def test_unknown_health_waits_for_healthy_in_both_modes(self):
+        for wait in ['true', 'false']:
+            with self.subTest(wait=wait):
+                (self.dir / 'state').unlink(missing_ok=True)
+                result = self.rollout(['None', 'Unknown', 'Healthy'], wait=wait)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertGreaterEqual(json.loads((self.dir / 'state').read_text())['health_calls'], 4)
+
+    def test_unknown_health_does_not_pass_in_scale_to_zero_mode(self):
+        result = self.rollout(['None'], wait='false')
+        self.assertNotEqual(0, result.returncode)
+        apps = json.loads(self.outputs()['apps'])
+        self.assertEqual('None', apps[0]['health'])
 
 
 class Publish(Step):

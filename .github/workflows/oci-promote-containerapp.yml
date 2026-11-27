@@ -176,26 +176,37 @@ jobs:
           set -euo pipefail
           [[ -n "$RESOURCE_GROUP" ]] || { echo 'No resource group (input or AZ_RG).' >&2; exit 1; }
           results='[]'
-          mapfile -t apps < <(printf '%s\n' "$APPS" | sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*$/d' -e "s/\${AZ_ENV}/$AZ_ENV/g")
+          apps=()
+          while IFS= read -r app; do apps+=("$app"); done < <(printf '%s\n' "$APPS" | sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*$/d' -e "s/\${AZ_ENV}/$AZ_ENV/g")
           [[ "${#apps[@]}" -gt 0 ]] || { echo 'No Container Apps given.' >&2; exit 1; }
 
-          # Preflight every app before changing any: registry access is Terraform-owned and must already exist.
+          # Snapshot all apps before any mutation, then retain each transition even if a command fails.
+          save_results() { echo "apps=$results" >> "$GITHUB_OUTPUT"; }
           for app in "${apps[@]}"; do
             servers="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query 'properties.configuration.registries[].server' -o tsv --only-show-errors)"
             grep -qxF "$REGISTRY" <<<"$servers" || {
               echo "$app has no registry entry for $REGISTRY. Apply the workload Terraform that grants AcrPull and configures the shared registry first." >&2
               exit 1
             }
+            previous_revision="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query properties.latestRevisionName -o tsv --only-show-errors)"
+            previous_image="$(az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query 'properties.template.containers[0].image' -o tsv --only-show-errors)"
+            results="$(jq -c --arg app "$app" --arg pr "$previous_revision" --arg pi "$previous_image" \
+              '. + [{app:$app, previous_revision:$pr, previous_image:$pi, revision:"", health:"", replicas:"", status:"pending"}]' <<<"$results")"
+            save_results
           done
 
+          index=0
           for app in "${apps[@]}"; do
             show() { az containerapp show -n "$app" -g "$RESOURCE_GROUP" --query "$1" -o tsv --only-show-errors; }
-            previous_revision="$(show properties.latestRevisionName)"
-            previous_image="$(show 'properties.template.containers[0].image')"
-
+            previous_revision="$(jq -r --argjson i "$index" '.[$i].previous_revision' <<<"$results")"
+            previous_image="$(jq -r --argjson i "$index" '.[$i].previous_image' <<<"$results")"
+            results="$(jq -c --argjson i "$index" '.[$i].status = "updating"' <<<"$results")"
+            save_results
             az containerapp update -n "$app" -g "$RESOURCE_GROUP" --image "$IMAGE_REF" --only-show-errors --output none
 
             new_revision="$(show properties.latestRevisionName)"
+            results="$(jq -c --argjson i "$index" --arg revision "$new_revision" '.[$i].revision = $revision | .[$i].status = "updated"' <<<"$results")"
+            save_results
             new_image="$(show 'properties.template.containers[0].image')"
             [[ "$new_image" == "$IMAGE_REF" ]] || { echo "$app did not retain $IMAGE_REF." >&2; exit 1; }
             if [[ "$previous_image" != "$IMAGE_REF" && "$new_revision" == "$previous_revision" ]]; then
@@ -209,11 +220,14 @@ jobs:
               provisioning="$(rev properties.provisioningState)"
               health="$(rev properties.healthState)"
               replicas="$(az containerapp replica count -n "$app" -g "$RESOURCE_GROUP" --revision "$new_revision" -o tsv --only-show-errors || echo 0)"
+              results="$(jq -c --argjson i "$index" --arg p "$provisioning" --arg h "$health" --arg r "$replicas" \
+                '.[$i].provisioning = $p | .[$i].health = $h | .[$i].replicas = $r' <<<"$results")"
+              save_results
               if [[ "$provisioning" == 'Failed' || "$health" == 'Unhealthy' ]]; then
                 echo "$app revision $new_revision failed: provisioning=$provisioning health=$health. Previous image: $previous_image" >&2
                 exit 1
               fi
-              if [[ "$provisioning" == 'Provisioned' && "$health" != 'Unhealthy' ]] && \
+              if [[ "$provisioning" == 'Provisioned' && "$health" == 'Healthy' ]] && \
                  { [[ "$WAIT_FOR_REPLICAS" != 'true' ]] || [[ "$replicas" =~ ^[1-9][0-9]*$ ]]; }; then
                 healthy=true
                 break
@@ -221,11 +235,10 @@ jobs:
               sleep 10
             done
             "$healthy" || { echo "$app revision $new_revision was not healthy within 10 minutes. Previous image: $previous_image" >&2; exit 1; }
-
-            results="$(jq -c --arg app "$app" --arg pr "$previous_revision" --arg pi "$previous_image" --arg nr "$new_revision" --arg h "$health" --arg r "$replicas" \
-              '. + [{app:$app, previous_revision:$pr, previous_image:$pi, revision:$nr, health:$h, replicas:$r}]' <<<"$results")"
+            results="$(jq -c --argjson i "$index" '.[$i].status = "healthy"' <<<"$results")"
+            save_results
+            index=$((index + 1))
           done
-          echo "apps=$results" >> "$GITHUB_OUTPUT"
 
       - name: Write the promotion record
         id: record
@@ -257,9 +270,9 @@ jobs:
             echo "- Image: \`$IMAGE_REF\` (source \`$REVISION\`)"
             echo "- Approvals: \`$(jq -c . <<<"$APPROVALS")\`"
             echo
-            echo '| App | Previous image | New revision | Health | Replicas |'
-            echo '| --- | --- | --- | --- | --- |'
-            jq -r '.[] | "| \(.app) | `\(.previous_image)` | `\(.revision)` | \(.health) | \(.replicas) |"' <<<"$APPS"
+            echo '| App | Status | Previous image | New revision | Health | Replicas |'
+            echo '| --- | --- | --- | --- | --- | --- |'
+            jq -r '.[] | "| \(.app) | \(.status) | `\(.previous_image)` | `\(.revision)` | \(.health) | \(.replicas) |"' <<<"$APPS"
             echo
             echo 'Rollback: rerun this workflow for this environment with a previous image-ref above.'
           } >> "$GITHUB_STEP_SUMMARY"
